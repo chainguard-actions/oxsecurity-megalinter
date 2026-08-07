@@ -9,6 +9,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 | Version | Tag | Upstream commit |
 |---------|-----|-----------------|
 | v6 | [`v6`](https://github.com/chainguard-actions/oxsecurity-megalinter/tree/v6) | [`93700f8`](https://github.com/oxsecurity/megalinter/commit/93700f8c21c59ea784a32abe23896e49e54463b8) |
+| v9.6.0 | [`v9.6.0`](https://github.com/chainguard-actions/oxsecurity-megalinter/tree/v9.6.0) | [`ef3e84b`](https://github.com/oxsecurity/megalinter/commit/ef3e84b8b836d76db562d0f3ed7da61e8fd538bc) |
 
 ## Privacy
 
