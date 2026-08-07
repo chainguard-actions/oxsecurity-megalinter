@@ -1,0 +1,410 @@
+---
+descriptor_id: JAVASCRIPT
+descriptor_type: language
+descriptor_flavors:
+  - cupcake
+  - dotnetweb
+  - formatters
+  - javascript
+file_extensions:
+  - ".js"
+linters:
+  # ESLINT
+  - class: EslintLinter
+    linter_name: eslint
+    name: JAVASCRIPT_ES
+    can_output_sarif: true
+    linter_spdx_license: MIT
+    file_extensions:
+      - ".js"
+      - ".vue"
+    linter_text: |
+      **ESLint** is the #1 JavaScript linter by downloads on npm (over 77M weekly downloads) and the most widely adopted pluggable linting utility for JavaScript and JSX. It helps you find and fix problems with your JavaScript code through static analysis.
+
+      **Key features:**
+
+      - **Static Code Analysis**: Quickly finds problems in JavaScript code without executing it
+      - **Automatic Fixing**: Many problems can be automatically fixed with syntax-aware corrections
+      - **Highly Configurable**: Completely customizable rules, parsers, and plugins ecosystem
+      - **Built-in Editor Integration**: Works seamlessly with most text editors
+      - **Extensible Plugin System**: Thousands of community plugins for frameworks like React, Vue, Node.js
+      - **Multiple Output Formats**: Supports various output formats including SARIF for security tools
+      - **Custom Rules**: Write your own rules that work alongside ESLint's built-in rules
+
+      **Common code quality checks:**
+
+      - **Syntax Errors**: Catches JavaScript syntax issues and typos
+      - **Code Style**: Enforces consistent formatting, naming conventions, and code structure
+      - **Best Practices**: Identifies problematic patterns and suggests improvements
+      - **Security Issues**: Detects potential security vulnerabilities (with security plugins)
+      - **Performance**: Identifies performance anti-patterns and optimizations
+
+      **Popular configurations:**
+
+      - **Airbnb Style Guide**: Industry-standard JavaScript style guide
+      - **Standard**: Minimal, opinionated code style with no configuration
+      - **Prettier Integration**: Seamless integration with Prettier for code formatting
+
+      ESLint requires a custom configuration file applicable to your project. You can create it by typing `npx eslint --init` in the root of your repository.
+
+      Used by companies like Microsoft, Airbnb, Netflix, and Facebook, ESLint helps maintain code quality and consistency across JavaScript projects of all sizes.
+
+      ### ESLint v10 — resolving bare imports from `eslint.config.mjs`
+
+      ESLint v10 dropped support for the legacy `.eslintrc.*` format and only loads the new flat config (`eslint.config.*`). When MegaLinter runs ESLint from its own container install (`/node-deps/node_modules`) instead of your project's local `node_modules`, Node's ESM resolver may fail to locate bare imports such as `import js from '@eslint/js'` (upstream limitation tracked in [eslint/eslint#18465](https://github.com/eslint/eslint/issues/18465)), producing errors like:
+
+      ```text
+      Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@eslint/js' imported from /github/workspace/eslint.config.mjs
+      ```
+
+      Two recommended workarounds:
+
+      #### Workaround 1 — Use `createRequire` in `eslint.config.mjs`
+
+      Bare imports fall back to CommonJS resolution (which honors `NODE_PATH` and will pick up MegaLinter's bundled `@eslint/js` and related plugins):
+
+      ```js
+      import { createRequire } from 'module';
+      const require = createRequire(import.meta.url);
+      const js = require('@eslint/js');
+      ```
+
+      #### Workaround 2 — Install dependencies in a pre-command and use the project-local ESLint binary
+
+      ESLint then runs from `<workspace>/node_modules` and resolves your config's imports naturally:
+
+      ```yaml
+      JAVASCRIPT_ES_PRE_COMMANDS:
+        - command: yarn install --frozen-lockfile --ignore-scripts
+          cwd: workspace
+          continue_if_failed: false
+      JAVASCRIPT_ES_CLI_EXECUTABLE: node_modules/.bin/eslint
+      ```
+
+      Replace `yarn install --frozen-lockfile --ignore-scripts` with `npm ci` (or `npm install --include=dev`) if your project uses npm.
+
+      For **pnpm** — which is not pre-installed in the MegaLinter image but ships with Node via [Corepack](https://nodejs.org/api/corepack.html) — enable it first, then install:
+
+      ```yaml
+      JAVASCRIPT_ES_PRE_COMMANDS:
+        - command: corepack enable pnpm
+          cwd: workspace
+          continue_if_failed: false
+        - command: pnpm install --frozen-lockfile --ignore-scripts
+          cwd: workspace
+          continue_if_failed: false
+      JAVASCRIPT_ES_CLI_EXECUTABLE: node_modules/.bin/eslint
+      ```
+
+      To add a single package with pnpm instead of installing the full tree, run `corepack enable pnpm` first, then `pnpm add --ignore-workspace --no-save <package>`.
+    linter_url: https://eslint.org
+    linter_repo: https://github.com/eslint/eslint
+    linter_rules_url: https://eslint.org/docs/latest/rules/
+    linter_banner_image_url: https://d33wubrfki0l68.cloudfront.net/3b5ac7586466159bb6f237b633bfc4f5a8d5acf8/ee0a1/assets/img/posts/eslint-collective.png
+    linter_rules_configuration_url: https://eslint.org/docs/latest/use/configure
+    linter_rules_inline_disable_url: https://eslint.org/docs/latest/use/configure/rules#disabling-rules
+    linter_rules_ignore_config_url: https://eslint.org/docs/latest/use/configure/ignore#the-eslintignore-file
+    linter_megalinter_ref_url: https://eslint.org/docs/latest/use/integrations#source-control
+    active_only_if_file_found:
+      - "eslint.config.js"
+      - "eslint.config.mjs"
+      - "eslint.config.cjs"
+      - "eslint.config.ts"
+      - "eslint.config.mts"
+      - "eslint.config.cts"
+      - ".eslintrc.json"
+      - ".eslintrc.yml"
+      - ".eslintrc.yaml"
+      - ".eslintrc.js"
+      - ".eslintrc.cjs"
+      - "package.json:eslintConfig"
+    cli_lint_mode: list_of_files
+    config_file_name: eslint.config.js
+    cli_lint_extra_args:
+      - "--no-ignore"
+    cli_lint_fix_arg_name: "--fix"
+    cli_sarif_args:
+      - --format
+      - "@microsoft/eslint-formatter-sarif"
+      - -o
+      - "{{SARIF_OUTPUT_FILE}}"
+    cli_lint_errors_count: regex_sum
+    cli_lint_errors_regex: "✖ ([0-9]+) problem"
+    common_linter_errors:
+      - identifier: JAVASCRIPT_ES_ERROR_PLUGIN_NOT_FOUND
+        regex: '(Failed to load plugin ''|ESLint couldn''t find the plugin "|Cannot find module ''eslint-plugin-)'
+        message: |-
+          ESLint could not load a plugin referenced in your config. The plugin is not installed in MegaLinter's bundled `node_modules` (`/node-deps/node_modules`).
+          Resolutions:
+            - Pre-install the missing plugin into MegaLinter's npm root via a pre-command in your .mega-linter.yml:
+                JAVASCRIPT_ES_PRE_COMMANDS:
+                  - command: "npm install eslint-plugin-NAME"
+                    cwd: "root"
+                    continue_if_failed: false
+            - Or install your project's full dependency tree and run ESLint from the workspace `node_modules`:
+                JAVASCRIPT_ES_PRE_COMMANDS:
+                  - command: yarn install --frozen-lockfile --ignore-scripts
+                    cwd: workspace
+                    continue_if_failed: false
+                JAVASCRIPT_ES_CLI_EXECUTABLE: node_modules/.bin/eslint
+            - Verify the plugin name in your ESLint config matches the published npm package name.
+      - identifier: JAVASCRIPT_ES_ERROR_CONFIG_NOT_FOUND
+        regex: '(ESLint couldn''t find the config "|Failed to load config "|Cannot find module ''eslint-config-)'
+        message: |-
+          ESLint could not resolve a shareable config referenced via `extends` (e.g. `airbnb`, `standard`, `prettier`). The config package is not installed in MegaLinter's bundled `node_modules`.
+          Resolutions:
+            - Pre-install the missing config package via a pre-command in your .mega-linter.yml:
+                JAVASCRIPT_ES_PRE_COMMANDS:
+                  - command: "npm install eslint-config-NAME"
+                    cwd: "root"
+                    continue_if_failed: false
+            - Or install your project's dependencies and run ESLint from the workspace binary (see ESLint v10 section above).
+      - identifier: JAVASCRIPT_ES_ERROR_PARSER_NOT_FOUND
+        regex: "(Cannot find module '@?[A-Za-z0-9_/.-]*parser'|Failed to load parser '|Could not resolve parser)"
+        message: |-
+          ESLint could not load the parser referenced in your config (e.g. `@babel/eslint-parser`, `vue-eslint-parser`). The parser package is not bundled in MegaLinter and must be installed.
+          Resolutions:
+            - Pre-install the parser via a pre-command in your .mega-linter.yml:
+                JAVASCRIPT_ES_PRE_COMMANDS:
+                  - command: "npm install @babel/eslint-parser"
+                    cwd: "root"
+                    continue_if_failed: false
+            - Or install the full project tree and use the workspace ESLint binary (see ESLint v10 section above).
+      - identifier: JAVASCRIPT_ES_ERROR_FLAT_CONFIG_MODULE_NOT_FOUND
+        regex: "ERR_MODULE_NOT_FOUND.+eslint\\.config\\."
+        message: |-
+          ESLint v9+/v10 flat config (`eslint.config.mjs`) uses native ESM resolution, which does not honor `NODE_PATH`. Bare imports like `import js from '@eslint/js'` fail when ESLint runs from MegaLinter's bundled install.
+          Resolutions:
+            - Use `createRequire` in your `eslint.config.mjs` (see the "ESLint v10" section in this linter's documentation above).
+            - Or install your project's dependencies and run the project-local ESLint binary:
+                JAVASCRIPT_ES_PRE_COMMANDS:
+                  - command: yarn install --frozen-lockfile --ignore-scripts
+                    cwd: workspace
+                    continue_if_failed: false
+                JAVASCRIPT_ES_CLI_EXECUTABLE: node_modules/.bin/eslint
+      - identifier: JAVASCRIPT_ES_ERROR_OUT_OF_MEMORY
+        regex: "(JavaScript heap out of memory|FATAL ERROR:.+Allocation failed|Reached heap limit Allocation failed)"
+        message: |-
+          ESLint ran out of Node.js heap memory. This typically happens on very large codebases or when type-aware rules (`parserOptions.project`) load the entire TypeScript program.
+          Resolutions:
+            - Raise the Node.js heap and whitelist the var for this linter (MegaLinter strips most env vars by default):
+                JAVASCRIPT_ES_UNSECURED_ENV_VARIABLES:
+                  - NODE_OPTIONS
+                NODE_OPTIONS: "--max-old-space-size=8192"
+            - Reduce scope via `JAVASCRIPT_ES_FILTER_REGEX_INCLUDE` / `JAVASCRIPT_ES_FILTER_REGEX_EXCLUDE`.
+            - Disable type-aware rules or remove `parserOptions.project` if it is not strictly required.
+    examples:
+      - "eslint myfile.js"
+      - "eslint -c eslint.config.js --no-ignore myfile.js"
+      - "eslint --fix -c eslint.config.js --no-ignore myfile.js"
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=npm depName=eslint
+          ARG NPM_ESLINT_VERSION=10.5.0
+        - |-
+          # renovate: datasource=npm depName=@eslint/js
+          ARG NPM_ESLINT_JS_VERSION=10.0.1
+        - |-
+          # renovate: datasource=npm depName=eslint-config-prettier
+          ARG NPM_ESLINT_CONFIG_PRETTIER_VERSION=10.1.8
+        - |-
+          # renovate: datasource=npm depName=eslint-plugin-import-x
+          ARG NPM_ESLINT_PLUGIN_IMPORT_X_VERSION=4.17.0
+        - |-
+          # renovate: datasource=npm depName=eslint-plugin-jest
+          ARG NPM_ESLINT_PLUGIN_JEST_VERSION=29.15.2
+        - |-
+          # renovate: datasource=npm depName=eslint-plugin-n
+          ARG NPM_ESLINT_PLUGIN_N_VERSION=18.1.0
+        - |-
+          # renovate: datasource=npm depName=eslint-plugin-prettier
+          ARG NPM_ESLINT_PLUGIN_PRETTIER_VERSION=5.5.6
+        - |-
+          # renovate: datasource=npm depName=eslint-plugin-promise
+          ARG NPM_ESLINT_PLUGIN_PROMISE_VERSION=7.3.0
+        - |-
+          # renovate: datasource=npm depName=eslint-plugin-vue
+          ARG NPM_ESLINT_PLUGIN_VUE_VERSION=10.9.2
+        - |-
+          # renovate: datasource=npm depName=@microsoft/eslint-formatter-sarif
+          ARG NPM_MICROSOFT_ESLINT_FORMATTER_SARIF_VERSION=3.1.0
+      npm:
+        - eslint@${NPM_ESLINT_VERSION}
+        - "@eslint/js@${NPM_ESLINT_JS_VERSION}"
+        - eslint-config-prettier@${NPM_ESLINT_CONFIG_PRETTIER_VERSION}
+        - eslint-plugin-import-x@${NPM_ESLINT_PLUGIN_IMPORT_X_VERSION}
+        - eslint-plugin-jest@${NPM_ESLINT_PLUGIN_JEST_VERSION}
+        - eslint-plugin-n@${NPM_ESLINT_PLUGIN_N_VERSION}
+        - eslint-plugin-prettier@${NPM_ESLINT_PLUGIN_PRETTIER_VERSION}
+        - eslint-plugin-promise@${NPM_ESLINT_PLUGIN_PROMISE_VERSION}
+        - eslint-plugin-vue@${NPM_ESLINT_PLUGIN_VUE_VERSION}
+        - "@microsoft/eslint-formatter-sarif@${NPM_MICROSOFT_ESLINT_FORMATTER_SARIF_VERSION}"
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+    ide:
+      brackets:
+        - name: brackets-eslint
+          url: https://github.com/brackets-userland/brackets-eslint
+      eclipse:
+        - name: Tern-Linter-ESLint
+          url: https://github.com/angelozerr/tern.java/wiki/Tern-Linter-ESLint
+      emacs:
+        - name: flycheck
+          url: http://www.flycheck.org/en/latest/languages.html#javascript
+      idea:
+        - name: ESLint Plugin
+          url: https://plugins.jetbrains.com/plugin/7494-eslint
+          id: com.wix.eslint
+      sublime:
+        - name: SublimeLinter-eslint
+          url: https://github.com/roadhump/SublimeLinter-eslint
+      vim:
+        - name: ale
+          url: https://github.com/w0rp/ale
+        - name: Syntastic
+          url: https://github.com/vim-syntastic/syntastic/tree/master/syntax_checkers/javascript
+      vscode:
+        - name: vscode-eslint
+          url: https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint
+  # STANDARD
+  - class: JavaScriptStandardLinter
+    linter_name: standard
+    linter_text: |
+      **JavaScript Standard Style** is a popular zero-configuration JavaScript linter and code formatter that eliminates endless debates about code style by providing a strict, opinionated set of rules. It serves as both a style guide and automated enforcement tool for clean, consistent JavaScript.
+
+      **Key Features:**
+
+      - **Zero Configuration**: No configuration files, command-line flags, or setup required - just install and run
+      - **Automatic Fixing**: Built-in `--fix` option automatically corrects most style violations
+      - **Strict Style Rules**: Enforces 2-space indentation, single quotes, no semicolons, and other proven conventions
+      - **Wide Adoption**: Used by thousands of projects including npm, GitHub, Zeit, MongoDB, and Express
+      - **Comprehensive Coverage**: Catches stylistic errors, potential bugs, and dangerous patterns
+      - **Fast Performance**: Quick analysis suitable for large codebases
+      - **Plugin Ecosystem**: Extensions available for React, Flow, TypeScript, and other JavaScript variants
+      - **Clear Error Messages**: Helpful error descriptions with links to explanations and examples
+    linter_spdx_license: MIT
+    activation_rules:
+      - type: variable
+        variable: JAVASCRIPT_DEFAULT_STYLE
+        expected_value: standard
+        default_value: standard
+    linter_url: https://standardjs.com/
+    linter_repo: https://github.com/standard/standard
+    linter_rules_url: https://standardjs.com/rules.html
+    linter_rules_configuration_url: https://standardjs.com/#how-do-i-ignore-files
+    linter_rules_inline_disable_url: https://standardjs.com/#how-do-i-disable-a-rule
+    linter_banner_image_url: https://github.com/standard/standard/raw/master/sticker.png
+    name: JAVASCRIPT_STANDARD
+    cli_lint_mode: list_of_files
+    cli_lint_fix_arg_name: "--fix"
+    test_folder: javascript_standard
+    examples:
+      - "standard myfile.js"
+      - "standard --fix myfile.js"
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=npm depName=standard
+          ARG NPM_STANDARD_VERSION=17.1.2
+      npm:
+        - standard@${NPM_STANDARD_VERSION}
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+    ide:
+      brackets:
+        - name: brackets-standard
+          url: https://github.com/ishamf/brackets-standard/
+      idea:
+        - name: native support
+          url: https://blog.jetbrains.com/webstorm/2017/01/webstorm-2017-1-eap-171-2272/
+      sublime:
+        - name: SublimeLinter-contrib-standard
+          url: https://packagecontrol.io/packages/SublimeLinter-contrib-standard
+        - name: StandardFormat
+          url: https://packagecontrol.io/packages/StandardFormat
+      vscode:
+        - name: vscode-standard
+          url: https://marketplace.visualstudio.com/items?itemName=standard.vscode-standard
+  # PRETTIER
+  - linter_name: prettier
+    linter_text: |
+      **Prettier** is the industry-leading opinionated code formatter that brings consistency to JavaScript and many other languages by automatically reformatting code according to proven formatting principles. It eliminates formatting debates and ensures uniform code style across entire development teams.
+
+      **Key Features:**
+
+      - **Multi-Language Support**: Formats JavaScript, TypeScript, CSS, HTML, JSON, Markdown, YAML, and 20+ other languages
+      - **Opinionated Formatting**: Zero-configuration approach with sensible defaults that work well for most projects
+      - **Parse Safety**: Ensures formatted code maintains semantic equivalence to the original through AST-based processing
+      - **Consistent Output**: Deterministic formatting produces identical results regardless of environment or developer
+      - **Team Standardization**: Eliminates style discussions and ensures consistent formatting across team members
+      - **Fast Performance**: High-speed formatting suitable for large codebases
+      - **Configuration Flexibility**: Supports project-specific settings through .prettierrc files when customization is needed
+      - **Git Integration**: Reduces merge conflicts by maintaining consistent formatting across branches
+    is_formatter: true
+    linter_spdx_license: MIT
+    activation_rules:
+      - type: variable
+        variable: JAVASCRIPT_DEFAULT_STYLE
+        expected_value: prettier
+        default_value: standard
+    linter_url: https://prettier.io/
+    linter_repo: https://github.com/prettier/prettier
+    linter_rules_url: https://prettier.io/docs/en/options.html
+    linter_rules_configuration_url: https://prettier.io/docs/en/configuration.html
+    linter_rules_inline_disable_url: https://prettier.io/docs/en/ignore.html#javascript
+    linter_banner_image_url: https://unpkg.com/prettier-logo@1.0.3/images/prettier-banner-light.svg
+    config_file_name: ".prettierrc.json"
+    cli_lint_mode: list_of_files
+    cli_config_arg_name: "--config"
+    cli_lint_extra_args:
+      - "--check"
+    cli_lint_fix_arg_name: "--write" # Workaround for MegaLinter
+    cli_lint_fix_remove_args:
+      - "--check"
+    test_folder: javascript_prettier
+    test_variables:
+      JAVASCRIPT_DEFAULT_STYLE: prettier
+    examples:
+      - "prettier --check myfile.js"
+      - "prettier --config .prettierrc.json --check myfile.js"
+      - "prettier --config .prettierrc.json --write myfile.js" # format
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=npm depName=prettier
+          ARG NPM_PRETTIER_VERSION=3.8.4
+      npm:
+        - "prettier@${NPM_PRETTIER_VERSION}"
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+    ide:
+      emacs:
+        - name: prettier-emacs
+          url: https://github.com/prettier/prettier-emacs
+        - name: prettier.el
+          url: https://github.com/jscheid/prettier.el
+        - name: apheleia
+          url: https://github.com/raxod502/apheleia
+      idea:
+        - name: Prettier
+          url: https://plugins.jetbrains.com/plugin/10456-prettier
+          id: intellij.prettierJS
+      sublime:
+        - name: JsPrettier
+          url: https://packagecontrol.io/packages/JsPrettier
+      vim:
+        - name: vim-prettier
+          url: https://github.com/prettier/vim-prettier
+      visual_studio:
+        - name: JavaScriptPrettier
+          url: https://github.com/madskristensen/JavaScriptPrettier
+      vscode:
+        - name: prettier-vscode
+          url: https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode

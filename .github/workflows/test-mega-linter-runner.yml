@@ -1,0 +1,59 @@
+---
+name: "Test mega-linter-runner"
+on: 
+  push:
+    paths-ignore:
+      - .github/CONTRIBUTING.md
+      - CHANGELOG.md
+      - README.md
+      - .github/workflows/slash-command-dispatch.yml
+      - .github/workflows/help-command.yml
+      - .github/workflows/build-command.yml
+  pull_request:
+    paths-ignore:
+      - .github/CONTRIBUTING.md
+      - CHANGELOG.md
+      - README.md
+      - .github/workflows/slash-command-dispatch.yml
+      - .github/workflows/help-command.yml
+      - .github/workflows/build-command.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+
+  build:
+    name: Test MegaLinter runner
+    # Set the agent to run on
+    runs-on: ubuntu-latest
+    # Prevent duplicate run from happening when a forked push is committed
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    timeout-minutes: 60
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24.x"
+      - name: Install dependencies
+        run: cd mega-linter-runner && yarn install --frozen-lockfile && npm link
+
+      # Free disk space
+      - name: Free Disk space
+        shell: bash
+        run: |
+          sudo rm -rf /usr/local/lib/android  # will release about 10 GB if you don't need Android
+          sudo rm -rf /usr/share/dotnet # will release about 20GB if you don't need .NET
+          sudo rm -rf /opt/hostedtoolcache/CodeQL # large cache
+          sudo rm -rf /opt/hostedtoolcache/go # Go toolcache
+      # Run mocha tests
+      - name: Run tests
+        run: cd mega-linter-runner && npm run test

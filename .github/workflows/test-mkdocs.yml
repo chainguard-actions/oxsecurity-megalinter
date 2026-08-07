@@ -1,0 +1,32 @@
+name: "Check MkDocs generation"
+on:
+  push:
+    paths:
+      - "**/mkdocs.yml"
+  pull_request:
+    paths:
+      - "**/mkdocs.yml"
+
+permissions: {}
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+
+  test-doc-gen:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: 3.14.6
+      - run: pip install --upgrade -r .config/python/dev/requirements.txt
+      - run: cd .automation && bash build_schemas_doc.sh && cd ..
+      - run: mkdocs build
+
+ 

@@ -1,0 +1,112 @@
+{
+  "name": "mega-linter-runner",
+  "version": "9.6.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oxsecurity/megalinter.git"
+  },
+  "type": "module",
+  "description": "Local runner for MegaLinter",
+  "main": "index.js",
+  "files": [
+    "lib",
+    "generators"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "bin": {
+    "mega-linter-runner": "lib/index.js"
+  },
+  "scripts": {
+    "test": "mocha \"test/**/*.test.js\""
+  },
+  "keywords": [
+    "mega-linter",
+    "code",
+    "quality",
+    "runner",
+    "aggregator",
+    "javascript",
+    "typescript",
+    "python",
+    "c",
+    "java",
+    "csharp",
+    "yaml",
+    "json",
+    "rst",
+    "markdown",
+    "dotnet",
+    "lua",
+    "r",
+    "c++",
+    "dockerfile",
+    "bash",
+    "dart",
+    "go",
+    "groovy",
+    "react",
+    "perl",
+    "php",
+    "powershell",
+    "kotlin",
+    "scala",
+    "linter",
+    "lint",
+    "technical",
+    "debt",
+    "raku",
+    "ruby",
+    "rust",
+    "sql",
+    "basic",
+    "puppet",
+    "cloudformation",
+    "css",
+    "env",
+    "dotenv",
+    "graphql",
+    "latex",
+    "protocol",
+    "buffer",
+    "kubernetes",
+    "gherkin",
+    "cucumber",
+    "terraform",
+    "snakemake",
+    "ansible",
+    "jsonschema",
+    "swift"
+  ],
+  "author": "Nicolas Vuillamy",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.4.1",
+    "find-package-json": "^1.2.0",
+    "fs-extra": "^11.1.1",
+    "glob": "^13.0.0",
+    "js-yaml": "^4.1.0",
+    "mem-fs": "^4.0.0",
+    "open": "^11.0.0",
+    "optionator": "^0.9.3",
+    "prompts": "^2.4.2",
+    "simple-git": "^3.28.0",
+    "uuid": "^14.0.0",
+    "which": "^7.0.0",
+    "yeoman-environment": "^6.0.0",
+    "yeoman-generator": "^8.0.0"
+  },
+  "devDependencies": {
+    "assert": "^2.1.0",
+    "eslint": "^10.0.0",
+    "mocha": "^11.0.0"
+  },
+  "resolutions": {
+    "diff": "^9.0.0",
+    "ip-address": "^10.1.1",
+    "serialize-javascript": "^7.0.5",
+    "semver": "7.8.5",
+    "tmp": "0.2.7"
+  }
+}
