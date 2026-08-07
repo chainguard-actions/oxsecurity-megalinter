@@ -1,0 +1,127 @@
+---
+name: "Auto-Update Linters"
+on:
+  # Run when there is an update in main
+  push:
+    branches:
+      - "main"
+      - "auto-update"
+  # Automatically run every day at midnight
+  schedule:
+    - cron: "0 0 * * *"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+###############
+# Set the Job #
+###############
+jobs:
+
+  build_help_versions:
+    # Name the Job
+    name: Auto-Update Linters
+    # Set the agent to run on
+    runs-on: ubuntu-latest
+    # Prevent duplicate run from happening when a forked push is committed
+    if: (github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository) && github.repository == 'oxsecurity/megalinter'
+    # Set max build time for the job
+    timeout-minutes: 60
+    ##################
+    # Load all steps #
+    ##################
+    steps:
+      ##########################
+      # Checkout the code base #
+      ##########################
+      - name: Checkout Code
+        uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3
+
+      #######################
+      # Docker Buildx setup #
+      #######################
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@2b82ce82d56a2a04d2637cd93a637ae1b359c0a7 # v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@885d1462b80bc1c1c7f0b00334ad271f09369c55 # v2
+
+      ########################
+      # Get the current date #
+      ########################
+      - name: Get current date
+        run: echo "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> ${GITHUB_ENV}
+
+      ###################################
+      # Build image locally for testing #
+      ###################################
+      - name: Build MegaLinter Docker Image
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9 # v4
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          build-args: |
+            BUILD_DATE=${{ env.BUILD_DATE }}
+            BUILD_REVISION=auto_update_${{ github.sha }}
+            BUILD_VERSION=auto_update_${{ github.sha }}
+          load: true
+          push: false
+          secrets: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          tags: |
+            oxsecurity/megalinter:auto_update_${{ github.sha }}
+        timeout-minutes: 60
+
+      #####################################
+      # Collect linters versions & help    #
+      #####################################
+      - name: Collect latest versions and help
+        id: compute_versions
+        shell: bash
+        env:
+          GITHUB_SHA_VAL: ${{ github.sha }}
+          PAT_SECRET: ${{ secrets.PAT }}
+        run: docker run -e UPGRADE_LINTERS_VERSION=true -e GITHUB_SHA="$GITHUB_SHA_VAL" -e GITHUB_TOKEN=${GITHUB_TOKEN} -e PAT="$PAT_SECRET" -e GITHUB_OUTPUT="${GITHUB_OUTPUT}" -e MEGALINTER_VOLUME_ROOT="${GITHUB_WORKSPACE}" -v "/var/run/docker.sock:/var/run/docker.sock:rw" -v "/home/runner/work/_temp/_runner_file_commands":"/github/file_commands" -v ${GITHUB_WORKSPACE}:/tmp/lint "oxsecurity/megalinter:auto_update_${GITHUB_SHA_VAL}"
+        timeout-minutes: 20
+
+      # Format markdown tables
+      - name: Format Markdown tables
+        id: format-md-tables
+        run: npx --yes markdown-table-formatter@latest --verbose "./**/*.md" || true
+
+      # Upload MegaLinter artifacts
+      - name: Archive production artifacts
+        if: ${{ success() }} || ${{ failure() }}
+        uses: actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5 # v3
+        with:
+          name: MegaLinter reports
+          path: |
+            docs
+            megalinter-reports
+
+      # Create pull request if there are updates
+      - name: Create Pull Request
+        id: cpr
+        if: steps.compute_versions.outputs.has_updated_versions == 1
+        uses: peter-evans/create-pull-request@38e0b6e68b4c852a5500a94740f0e535e0d7ba54 # v4
+        with:
+          token: ${{ secrets.PAT  }}
+          author: "Nicolas Vuillamy <nicolas.vuillamy@gmail.com>"
+          commit-message: "[automation] Auto-update linters version, help and documentation"
+          delete-branch: true
+          title: "[automation] Auto-update linters version, help and documentation"
+          body: "[automation] Auto-update linters version, help and documentation"
+          labels: dependencies,automerge
+      - name: Create PR output
+        env:
+          PR_NUMBER: ${{ steps.cpr.outputs.pull-request-number }}
+          PR_URL: ${{ steps.cpr.outputs.pull-request-url }}
+        run: |
+          echo "Pull Request Number - $PR_NUMBER"
+          echo "Pull Request URL - $PR_URL"

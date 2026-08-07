@@ -1,0 +1,114 @@
+---
+#########################
+#########################
+## Deploy Docker Image ##
+#########################
+#########################
+
+#
+# Documentation:
+# https://help.github.com/en/articles/workflow-syntax-for-github-actions
+#
+
+#######################################
+# Start the job on all push to main #
+#######################################
+name: "Build & Deploy - ALPHA"
+on:
+  push:
+    branches:
+      - "alpha"
+    paths:
+      - ".github/workflows/**"
+      - "Dockerfile"
+      - "flavors/**"
+      - "megalinter/**"
+      - "mega-linter-runner/**"
+      - "**/linter-versions.json"
+      - "TEMPLATES/**"
+      - ".trivyignore"
+      - "**/.sh"
+
+permissions:
+  contents: read
+  packages: write
+
+###############
+# Set the Job #
+###############
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+
+  build:
+    # Name the Job
+    name: Deploy Docker Image - ALPHA
+    # Set the agent to run on
+    runs-on: ubuntu-latest
+    # Only run this on the main repo
+    if: github.repository == 'oxsecurity/megalinter' && !contains(github.event.head_commit.message, 'skip deploy')
+    ##################
+    # Load all steps #
+    ##################
+    steps:
+      ##########################
+      # Checkout the code base #
+      ##########################
+      - name: Checkout Code
+        uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3
+
+      ########################################################
+      # Publish updated version of mega-linter-runner on NPM #
+      ########################################################
+      - uses: actions/setup-node@64ed1c7eab4cce3362f8c340dee64e5eaeef8f7c # v3.6.0
+        with:
+          node-version: "18.x"
+          registry-url: "https://registry.npmjs.org"
+      - run: cd mega-linter-runner && yarn install --frozen-lockfile
+      - run: cd mega-linter-runner && ALPHAID=$(date '+%Y%m%d%H%M') && npm version prerelease --preid="alpha$ALPHAID"
+        shell: bash
+      - run: cd mega-linter-runner && npm publish --tag alpha || echo "mega-linter-runner alpha not published"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@2b82ce82d56a2a04d2637cd93a637ae1b359c0a7 # v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@885d1462b80bc1c1c7f0b00334ad271f09369c55 # v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc # v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc # v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get current date
+        run: echo "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> ${GITHUB_ENV}
+
+      - name: Build & Push Docker Image
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9 # v4
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          build-args: |
+            BUILD_DATE=${{ env.BUILD_DATE }}
+            BUILD_REVISION=${{ github.sha }}
+            BUILD_VERSION=alpha
+          load: false
+          push: true
+          secrets: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          tags: |
+            oxsecurity/megalinter:alpha
+            ghcr.io/oxsecurity/megalinter:alpha

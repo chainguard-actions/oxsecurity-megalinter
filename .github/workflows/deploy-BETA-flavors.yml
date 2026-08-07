@@ -1,0 +1,150 @@
+---
+#########################
+#########################
+## Deploy Docker Image Flavors ##
+#########################
+#########################
+
+#
+# Documentation:
+# https://help.github.com/en/articles/workflow-syntax-for-github-actions
+#
+
+#######################################
+# Start the job on all push to main #
+#######################################
+name: "Build & Deploy - BETA Flavors"
+on:
+  push:
+    branches:
+      - "main"
+      - "FlavoredMegaLinters"
+    paths:
+      - ".github/workflows/**"
+      - "Dockerfile"
+      - "flavors/**"
+      - "megalinter/**"
+      - "mega-linter-runner/**"
+      - "**/linter-versions.json"
+      - "TEMPLATES/**"
+      - ".trivyignore"
+      - "**/.sh"
+
+permissions:
+  contents: read
+  packages: write
+
+###############
+# Set the Job #
+###############
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+
+  build:
+    # Name the Job
+    name: Deploy Docker Image - BETA - Flavors
+    # Set the agent to run on
+    runs-on: ${{ matrix.os }}
+    environment: 
+      name: beta-flavors
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        os: [ubuntu-latest]
+        # flavors-start
+        flavor:
+          [
+            "ci_light",
+            "cupcake",
+            "documentation",
+            "dotnet",
+            "go",
+            "java",
+            "javascript",
+            "php",
+            "python",
+            "ruby",
+            "rust",
+            "salesforce",
+            "security",
+            "swift",
+            "terraform",
+          ]
+# flavors-end
+    # Only run this on the main repo
+    if: github.repository == 'oxsecurity/megalinter' && !contains(github.event.head_commit.message, 'skip deploy')
+    ##################
+    # Load all steps #
+    ##################
+    steps:
+      ##########################
+      # Checkout the code base #
+      ##########################
+      - name: Checkout Code
+        uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@2b82ce82d56a2a04d2637cd93a637ae1b359c0a7 # v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@885d1462b80bc1c1c7f0b00334ad271f09369c55 # v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc # v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc # v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get current date
+        run: echo "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> ${GITHUB_ENV}
+
+      - name: Build Image
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9 # v4
+        with:
+          context: .
+          file: flavors/${{ matrix.flavor }}/Dockerfile
+          platforms: linux/amd64
+          build-args: |
+            BUILD_DATE=${{ env.BUILD_DATE }}
+            BUILD_REVISION=${{ github.sha }}
+            BUILD_VERSION=beta
+          load: false
+          push: true
+          secrets: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          tags: |
+            oxsecurity/megalinter-${{ matrix.flavor }}:beta
+            ghcr.io/oxsecurity/megalinter-${{ matrix.flavor }}:beta
+
+      # Free disk space
+      - name: Free Disk space
+        shell: bash
+        run: |
+          sudo rm -rf /usr/local/lib/android  # will release about 10 GB if you don't need Android
+          sudo rm -rf /usr/share/dotnet # will release about 20GB if you don't need .NET
+
+      ##############################################
+      # Check Docker image security with Trivy #
+      ##############################################
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@2736533278103862a861f4a35ebac3e97854d956 # master
+        with:
+          image-ref: 'docker.io/oxsecurity/megalinter-${{ matrix.flavor }}:beta'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          security-checks: vuln
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          timeout: 10m0s

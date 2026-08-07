@@ -1,0 +1,307 @@
+---
+#########################
+#########################
+## Deploy Docker Image ##
+#########################
+#########################
+
+#
+# Documentation:
+# https://help.github.com/en/articles/workflow-syntax-for-github-actions
+#
+
+#######################################
+# Start the job on all push to main #
+#######################################
+#############################
+# Start the job on all push #
+#############################
+name: "Build & Deploy - DEV"
+on:
+  push:
+    branches-ignore:
+      - main
+    paths-ignore:
+      - .github/CONTRIBUTING.md
+      - CHANGELOG.md
+      - README.md
+      - .github/workflows/slash-command-dispatch.yml
+      - .github/workflows/help-command.yml
+      - .github/workflows/build-command.yml
+  pull_request:
+    branches-ignore: []
+    paths-ignore:
+      - .github/CONTRIBUTING.md
+      - CHANGELOG.md
+      - README.md
+      - .github/workflows/slash-command-dispatch.yml
+      - .github/workflows/help-command.yml
+      - .github/workflows/build-command.yml
+
+permissions:
+  contents: read
+  packages: read
+
+###############
+# Set the Job #
+###############
+concurrency:
+  group: ${{ github.ref_name }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+
+  build:
+    # Name the Job
+    name: Tests + Deploy Docker Image - DEV
+    # Set the agent to run on
+    runs-on: ubuntu-latest
+    # Prevent duplicate run from happening when a forked push is committed
+    if: (github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository) && !contains(github.event.head_commit.message, 'skip deploy')
+    # Set max build time for the job
+    timeout-minutes: 120
+    ##################
+    # Load all steps #
+    ##################
+    steps:
+      ##########################
+      # Checkout the code base #
+      ##########################
+      - name: Checkout Code
+        uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3
+
+      #######################
+      # Docker Buildx setup #
+      #######################
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@2b82ce82d56a2a04d2637cd93a637ae1b359c0a7 # v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@885d1462b80bc1c1c7f0b00334ad271f09369c55 # v2
+
+      ########################
+      # Get the current date #
+      ########################
+      - name: Get current date
+        run: echo "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >>"$GITHUB_ENV"
+
+      ########################
+      # Build image tag name #
+      ########################
+      - name: Build image tag name
+        id: image_tag
+        env:
+          ACTOR: ${{ github.actor }}
+        run: |
+          BRANCH_NAME="${GITHUB_REF##*/}"
+          SAFE_ACTOR=$(printf '%s' "$ACTOR" | tr -d '\n\r')
+          TAG="test-${SAFE_ACTOR}-${BRANCH_NAME}"
+          echo "Tag name: ${TAG}"
+          safe_tag=$(printf '%s' "${TAG}" | tr -d '\n\r')
+          echo "tag=${safe_tag}" >>"$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@2b82ce82d56a2a04d2637cd93a637ae1b359c0a7 # v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@885d1462b80bc1c1c7f0b00334ad271f09369c55 # v2
+
+      - name: Login to Docker Hub
+        if: |
+          (
+          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+          (github.event_name == 'push' && github.repository == 'oxsecurity/megalinter')
+          )
+        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc # v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      ###################################
+      # Build image locally for testing #
+      ###################################
+      - name: Build MegaLinter Docker Image (quick)
+        if: "contains(github.event.head_commit.message, 'quick build')"
+        id: docker_build_quick
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9 # v4
+        with:
+          context: .
+          file: Dockerfile-quick
+          platforms: linux/amd64
+          build-args: |
+            BUILD_DATE=${{ env.BUILD_DATE }}
+            BUILD_REVISION=${{ github.sha }}
+            BUILD_VERSION=${{ steps.image_tag.outputs.tag }}
+            MEGA_LINTER_BASE_IMAGE="oxsecurity/megalinter:beta"
+          load: false
+          push: true
+          secrets: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          tags: |
+            oxsecurity/megalinter:${{ steps.image_tag.outputs.tag }}
+        timeout-minutes: 90
+
+      #######################################
+      # Build image (full for forked repos) #
+      #######################################
+      - name: Build MegaLinter Docker Image (full from forks)
+        if: |
+          (
+          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) ||
+          (github.event_name == 'push' && github.repository != 'oxsecurity/megalinter')
+          )
+          &&
+          !contains(github.event.head_commit.message, 'quick build')
+        id: docker_build
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9 # v4
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          build-args: |
+            BUILD_DATE=${{ env.BUILD_DATE }}
+            BUILD_REVISION=${{ github.sha }}
+            BUILD_VERSION=${{ steps.image_tag.outputs.tag }}
+          load: true
+          push: false
+          secrets: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          tags: |
+            oxsecurity/megalinter:${{ steps.image_tag.outputs.tag }}
+        timeout-minutes: 90
+
+      ####################################
+      # Build image (full for main repo) #
+      ####################################
+      - name: Build MegaLinter Docker Image (full from main repo) & push
+        if: |
+          (
+          (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) ||
+          (github.event_name == 'push' && github.repository == 'oxsecurity/megalinter')
+          )
+          &&
+          !contains(github.event.head_commit.message, 'quick build')
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9 # v4
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          build-args: |
+            BUILD_DATE=${{ env.BUILD_DATE }}
+            BUILD_REVISION=${{ github.sha }}
+            BUILD_VERSION=${{ steps.image_tag.outputs.tag }}
+          load: false
+          push: true
+          secrets: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          tags: |
+            oxsecurity/megalinter:${{ steps.image_tag.outputs.tag }}
+
+      # Free disk space
+      - name: Free Disk space
+        shell: bash
+        run: |
+          sudo rm -rf /usr/local/lib/android  # will release about 10 GB if you don't need Android
+          sudo rm -rf /usr/share/dotnet # will release about 20GB if you don't need .NET
+
+      #####################################
+      # Run Linter test cases #
+      #####################################
+      - name: Run Test Cases
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+          HEAD_REF: ${{ github.head_ref }}
+          REF_NAME: ${{ github.ref_name }}
+          GITHUB_SHA_VAL: ${{ github.sha }}
+          PAT_SECRET: ${{ secrets.PAT }}
+          HEAD_COMMIT_MSG: ${{ github.event.head_commit.message }}
+          IMAGE_TAG: ${{ steps.image_tag.outputs.tag }}
+        run: |
+          GITHUB_REPOSITORY=$([ "$EVENT_NAME" == "pull_request" ] && echo "$PR_REPO" || echo "$REPO")
+          GITHUB_BRANCH=$([ "$EVENT_NAME" == "pull_request" ] && echo "$HEAD_REF" || echo "$REF_NAME")
+
+          CODECOV_SCRIPT=$(mktemp)
+          curl -s https://codecov.io/env -o "$CODECOV_SCRIPT"
+          export CI_ENV="$(bash "$CODECOV_SCRIPT") -e GITHUB_ACTIONS"
+          TEST_KEYWORDS_TO_USE=""
+          if [[ "$HEAD_COMMIT_MSG" == *"TEST_KEYWORDS="* ]]; then
+            COMMIT_MSG="$HEAD_COMMIT_MSG"
+            TEST_KEYWORDS_TO_USE=${COMMIT_MSG#*TEST_KEYWORDS=}
+            echo "Run only tests with keywords ${TEST_KEYWORDS_TO_USE}"
+            if [[ "${TEST_KEYWORDS_TO_USE}" =~ $'\r' ]]; then
+                echo "Problem while parsing test keywords: switch back to all tests"
+                TEST_KEYWORDS_TO_USE=""
+            fi
+          fi
+
+          docker run $CI_ENV -e TEST_CASE_RUN=true -e OUTPUT_FORMAT=text -e OUTPUT_FOLDER="$GITHUB_SHA_VAL" -e OUTPUT_DETAIL=detailed -e GITHUB_SHA="$GITHUB_SHA_VAL" -e GITHUB_REPOSITORY="${GITHUB_REPOSITORY}" -e GITHUB_BRANCH="${GITHUB_BRANCH}" -e PAT="$PAT_SECRET" -e TEST_KEYWORDS="${TEST_KEYWORDS_TO_USE}" -e MEGALINTER_VOLUME_ROOT="${GITHUB_WORKSPACE}" -v "/var/run/docker.sock:/var/run/docker.sock:rw" -v "${GITHUB_WORKSPACE}:/tmp/lint" "oxsecurity/megalinter:${IMAGE_TAG}"
+        timeout-minutes: 60
+
+      #####################################
+      # Run Linter against ALL code base  #
+      #####################################
+      - name: Run against all code base
+        if: "!contains(github.event.head_commit.message, 'quick build')"
+        shell: bash
+        env:
+          REPO: ${{ github.repository }}
+          GITHUB_SHA_VAL: ${{ github.sha }}
+          GITHUB_TOKEN_VAL: ${{ github.token }}
+          GITHUB_RUN_ID_VAL: ${{ github.run_id }}
+          PAT_SECRET: ${{ secrets.PAT }}
+          IMAGE_TAG: ${{ steps.image_tag.outputs.tag }}
+        run: docker run -e GITHUB_REPOSITORY="$REPO" -e GITHUB_SHA="$GITHUB_SHA_VAL" -e GITHUB_TOKEN="$GITHUB_TOKEN_VAL" -e GITHUB_RUN_ID="$GITHUB_RUN_ID_VAL" -e PAT="$PAT_SECRET" -v "/var/run/docker.sock:/var/run/docker.sock:rw" -v ${GITHUB_WORKSPACE}:/tmp/lint "oxsecurity/megalinter:${IMAGE_TAG}"
+        timeout-minutes: 15
+
+      # Upload MegaLinter artifacts
+      - name: Archive production artifacts
+        if: ${{ success() }} || ${{ failure() }}
+        uses: actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5 # v3
+        with:
+          name: MegaLinter reports
+          path: |
+            megalinter-reports
+            mega-linter.log
+            linter-helps.json
+            linter-versions.json
+
+      - name: debug
+        if: ${{ success() }} || ${{ failure() }}
+        env:
+          DOCKER_BUILD_OUTCOME: ${{ steps.docker_build.outcome }}
+        run: echo "$DOCKER_BUILD_OUTCOME"
+
+      # Test mega-linter-runner with newly created image
+      - name: Setup Node
+        if: ${{ steps.docker_build.outcome }} == 'success' && !contains(github.event.head_commit.message, 'quick build')
+        uses: actions/setup-node@64ed1c7eab4cce3362f8c340dee64e5eaeef8f7c # v3.6.0
+        with:
+          node-version: "12"
+      - name: Install NPM dependencies
+        if: ${{ steps.docker_build.outcome }} == 'success' && !contains(github.event.head_commit.message, 'quick build')
+        run: cd mega-linter-runner && sudo yarn install --frozen-lockfile && sudo npm link
+      - name: Run mega-linter-runner tests
+        if: ${{ steps.docker_build.outcome }} == 'success' && !contains(github.event.head_commit.message, 'quick build')
+        env:
+          MEGALINTER_RELEASE: ${{ steps.image_tag.outputs.tag }}
+          MEGALINTER_NO_DOCKER_PULL: "true"
+        run: cd mega-linter-runner && npm run test
+
+      ##############################################
+      # Check Docker image security with Trivy #
+      ##############################################
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@2736533278103862a861f4a35ebac3e97854d956 # master
+        with:
+          image-ref: "docker.io/oxsecurity/megalinter:${{ steps.image_tag.outputs.tag }}"
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          security-checks: vuln
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          timeout: 15m0s

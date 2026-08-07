@@ -1,0 +1,154 @@
+---
+#########################
+#########################
+## Deploy Docker Image ##
+#########################
+#########################
+
+#
+# Documentation:
+# https://help.github.com/en/articles/workflow-syntax-for-github-actions
+#
+
+#######################################
+# Start the job on all push to main #
+#######################################
+name: "Build & Deploy - BETA"
+on:
+  push:
+    branches:
+      - "main"
+    paths:
+      - ".github/workflows/**"
+      - "Dockerfile"
+      - "flavors/**"
+      - "megalinter/**"
+      - "mega-linter-runner/**"
+      - "**/linter-versions.json"
+      - "TEMPLATES/**"
+      - ".trivyignore"
+      - "**/.sh"
+
+permissions:
+  contents: read
+  packages: write
+
+###############
+# Set the Job #
+###############
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+
+  build:
+    # Name the Job
+    name: Deploy Docker Image - BETA
+    # Set the agent to run on
+    runs-on: ubuntu-latest
+    # Only run this on the main repo
+    if: github.repository == 'oxsecurity/megalinter' && !contains(github.event.head_commit.message, 'skip deploy')
+    environment: 
+      name: beta
+    ##################
+    # Load all steps #
+    ##################
+    steps:
+      ##########################
+      # Checkout the code base #
+      ##########################
+      - name: Checkout Code
+        uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3
+
+      ########################################################
+      # Publish updated version of mega-linter-runner on NPM #
+      ########################################################
+      - uses: actions/setup-node@64ed1c7eab4cce3362f8c340dee64e5eaeef8f7c # v3.6.0
+        with:
+          node-version: "16.x"
+          registry-url: "https://registry.npmjs.org"
+      - run: cd mega-linter-runner && yarn install --frozen-lockfile
+      - run: cd mega-linter-runner && BETAID=$(date '+%Y%m%d%H%M') && npm version prerelease --preid="beta$BETAID"
+        shell: bash
+      - run: cd mega-linter-runner && npm publish --tag beta || echo "mega-linter-runner beta not published"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@2b82ce82d56a2a04d2637cd93a637ae1b359c0a7 # v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@885d1462b80bc1c1c7f0b00334ad271f09369c55 # v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc # v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@465a07811f14bebb1938fbed4728c6a1ff8901fc # v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get current date
+        run: echo "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> ${GITHUB_ENV}
+
+      - name: Build & Push Docker Image
+        uses: docker/build-push-action@0a97817b6ade9f46837855d676c4cca3a2471fc9 # v4
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          build-args: |
+            BUILD_DATE=${{ env.BUILD_DATE }}
+            BUILD_REVISION=${{ github.sha }}
+            BUILD_VERSION=beta
+          load: false
+          push: true
+          secrets: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          tags: |
+            oxsecurity/megalinter:beta
+            ghcr.io/oxsecurity/megalinter:beta
+
+      ###############################
+      # Run tests for code coverage #
+      ###############################
+      - name: Run Test Cases and code coverage
+        shell: bash
+        env:
+          GITHUB_SHA_VAL: ${{ github.sha }}
+          PAT_SECRET: ${{ secrets.PAT }}
+        run: |
+          CODECOV_SCRIPT=$(mktemp)
+          curl -s https://codecov.io/env -o "$CODECOV_SCRIPT"
+          export CI_ENV="$(bash "$CODECOV_SCRIPT") -e GITHUB_ACTIONS"
+          echo "CI_ENV=${CI_ENV}"
+          docker run $CI_ENV -e TEST_CASE_RUN=true -e OUTPUT_FORMAT=text -e OUTPUT_FOLDER="$GITHUB_SHA_VAL" -e OUTPUT_DETAIL=detailed -e GITHUB_SHA="$GITHUB_SHA_VAL" -e PAT="$PAT_SECRET" -e MEGALINTER_VOLUME_ROOT="${GITHUB_WORKSPACE}" -v "/var/run/docker.sock:/var/run/docker.sock:rw" -v ${GITHUB_WORKSPACE}:/tmp/lint oxsecurity/megalinter:beta
+        timeout-minutes: 60
+
+      # Free disk space
+      - name: Free Disk space
+        shell: bash
+        run: |
+          sudo rm -rf /usr/local/lib/android  # will release about 10 GB if you don't need Android
+          sudo rm -rf /usr/share/dotnet # will release about 20GB if you don't need .NET
+
+      ##############################################
+      # Check Docker image security with Trivy #
+      ##############################################
+#      - name: Run Trivy vulnerability scanner
+#        uses: aquasecurity/trivy-action@2736533278103862a861f4a35ebac3e97854d956 # master
+#        with:
+#          image-ref: "docker.io/oxsecurity/megalinter:beta"
+#          format: 'table'
+#          exit-code: '1'
+#          ignore-unfixed: true
+#          security-checks: vuln
+#          vuln-type: 'os,library'
+#          severity: 'CRITICAL,HIGH'
+#          timeout: 10m0s
