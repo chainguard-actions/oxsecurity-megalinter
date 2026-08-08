@@ -1,0 +1,52 @@
+name: Test MegaLinter basic usage
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - id: megalinter
+        uses: .
+        continue-on-error: true
+        env:
+          # Only lint the action.yml file to keep the run fast
+          FILTER_REGEX_INCLUDE: ".*action\\.yml$"
+          # Disable all heavy linter categories
+          DISABLE: REPOSITORY,SPELL,COPYPASTE,CREDENTIALS
+          # Disable all individual linters — pure smoke test
+          DISABLE_LINTERS: ACTION_ACTIONLINT,ANSIBLE_ANSIBLE_LINT,ARM_ARM_TTK,BASH_EXEC,BASH_SHELLCHECK,BASH_SHFMT,C_CPPLINT,CLOJURE_CLJ_KONDO,CLOUDFORMATION_CFN_LINT,COFFEE_COFFEELINT,CPP_CPPLINT,CSHARP_DOTNET_FORMAT,CSS_STYLELINT,DART_DARTANALYZE,DOCKERFILE_HADOLINT,EDITORCONFIG_EDITORCONFIG_CHECKER,ENV_DOTENV_LINTER,GHERKIN_GHERKIN_LINT,GO_GOLANGCI_LINT,GO_REVIVE,GRAPHQL_GRAPHQL_SCHEMA_LINTER,GROOVY_NPM_GROOVY_LINT,HTML_DJLINT,HTML_HTMLHINT,JAVA_CHECKSTYLE,JAVA_PMD,JAVASCRIPT_ES,JAVASCRIPT_PRETTIER,JAVASCRIPT_STANDARD,JSON_ESLINT_PLUGIN_JSONC,JSON_JSONLINT,JSON_PRETTIER,JSON_V8R,JSX_ESLINT,KOTLIN_KTLINT,KUBERNETES_HELM,KUBERNETES_KUBECONFORM,KUBERNETES_KUBESCAPE,LATEX_CHKTEX,LUA_LUACHECK,MAKEFILE_CHECKMAKE,MARKDOWN_MARKDOWNLINT,MARKDOWN_MARKDOWN_LINK_CHECK,MARKDOWN_MARKDOWN_TABLE_FORMATTER,MARKDOWN_REMARK_LINT,OPENAPI_SPECTRAL,PERL_PERLCRITIC,PHP_PHPCS,PHP_PHPLINT,PHP_PHPSTAN,PHP_PSALM,POWERSHELL_POWERSHELL,POWERSHELL_POWERSHELL_FORMATTER,PROTOBUF_PROTOLINT,PYTHON_BANDIT,PYTHON_BLACK,PYTHON_FLAKE8,PYTHON_ISORT,PYTHON_MYPY,PYTHON_PYLINT,PYTHON_PYRIGHT,PYTHON_RUFF,R_LINTR,RAKU_RAKU,RUBY_RUBOCOP,RUST_CLIPPY,SALESFORCE_SFDX_SCANNER_APEX,SALESFORCE_SFDX_SCANNER_AURA,SALESFORCE_SFDX_SCANNER_LWC,SCALA_SCALAFIX,SNAKEMAKE_LINT,SNAKEMAKE_SNAKEFMT,SQL_SQLFLUFF,SQL_TSQLLINT,SWIFT_SWIFTLINT,TEKTON_TEKTON_LINT,TERRAFORM_TERRAFORM_FMT,TERRAFORM_TERRAGRUNT,TERRAFORM_TERRASCAN,TERRAFORM_TFLINT,TSX_ESLINT,TYPESCRIPT_ES,TYPESCRIPT_PRETTIER,TYPESCRIPT_STANDARD,VB_DOTNET_FORMAT,XML_XMLLINT,YAML_PRETTIER,YAML_YAMLLINT,YAML_V8R
+          VALIDATE_ALL_CODEBASE: "true"
+          DEFAULT_BRANCH: act-harness
+          GITHUB_TOKEN: ${{ github.token }}
+          # Suppress GitHub API calls that would fail on the sentinel repo
+          GITHUB_STATUS_REPORTER: "false"
+          POST_GITHUB_COMMENT: "false"
+          GITHUB_COMMENT_REPORTER: "false"
+          # Reduce log verbosity
+          LOG_LEVEL: WARNING
+
+      - name: Assert MegaLinter ran and produced output
+        env:
+          OUTCOME: ${{ steps.megalinter.outcome }}
+          HAS_UPDATED: ${{ steps.megalinter.outputs.has_updated_sources }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "has_updated_sources: $HAS_UPDATED"
+          # MegaLinter may succeed (no lint errors) or fail (lint errors found).
+          # Both are valid — what matters is that the action ran at all.
+          if [ "$OUTCOME" = "success" ]; then
+            if [ "$HAS_UPDATED" != "0" ] && [ "$HAS_UPDATED" != "1" ]; then
+              echo "FAIL: expected has_updated_sources to be 0 or 1, got '$HAS_UPDATED'"
+              exit 1
+            fi
+            echo "PASS: MegaLinter succeeded, has_updated_sources=$HAS_UPDATED"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: MegaLinter ran but reported linting failures (acceptable in test environment)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

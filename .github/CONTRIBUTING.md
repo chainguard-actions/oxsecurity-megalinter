@@ -1,0 +1,362 @@
+# Contributing
+
+:wave: Hi there!
+We're thrilled that you'd like to contribute to this project. Your help is essential for keeping it great.
+
+## Claude Code
+
+MegaLinter ships with a [`CLAUDE.md`](../CLAUDE.md) file and a set of Claude Code skills that automate the most common contribution tasks. If you use [Claude Code](https://claude.ai/code), these skills handle the repetitive work so you can focus on the logic.
+
+### Available skills
+
+| Skill                                       | What it does                                                              |
+|---------------------------------------------|---------------------------------------------------------------------------|
+| `/add-linter [name]`                        | Guided workflow: descriptor, fixtures, build, changelog                   |
+| `/update-linter-version [linter] [version]` | Bump a linter's pinned version and rebuild                                |
+| `/review-descriptor [name]`                 | Audit a descriptor YAML for completeness and correctness                  |
+| `/fix-linter-test [name]`                   | Debug a failing linter test (fixtures, regex, Docker)                     |
+| `/add-reporter [name]`                      | Add a new output reporter                                                 |
+| `/add-flavor [name]`                        | Add a new Docker flavor                                                   |
+| `/build`                                    | Run `make megalinter-build` to regenerate all generated files             |
+| `/diagnose-config`                          | Debug a `.mega-linter.yml` configuration                                  |
+| `/fix-security-issue [CVE]`                 | Handle CVE reports from trivy / osv-scanner (upgrade or justified ignore) |
+
+See [`CLAUDE.md`](../CLAUDE.md) for architecture notes, coding conventions, and the full list of agents and rules that Claude Code uses in this repository.
+
+## How to Contribute
+
+### 1. Create an issue
+
+Report problems or suggest improvements by [creating an issue](https://github.com/oxsecurity/megalinter/issues).
+
+### 2. Fork the project
+
+[Fork the repository](https://github.com/oxsecurity/megalinter) to your GitHub account.
+
+### 3. Make changes
+
+Clone your fork locally and make the necessary changes:
+
+```bash
+git clone git@github.com:YOURNAMESPACE/megalinter.git
+```
+
+### 4. Test your changes
+
+#### 4.1 Visual Studio Code Dev Containers
+
+The Visual Studio Code Dev Containers extension lets you use a container as a full-featured development environment:
+
+1. Fork the `megalinter` repository
+2. [Open your fork](https://docs.github.com/en/codespaces/developing-in-a-codespace/rebuilding-the-container-in-a-codespace#rebuilding-a-container) in VS Code
+3. Create a new branch: `git checkout -b my-feature-branch`
+4. Make your changes and commit: `git add .` and `git commit -m "chore: description of changes"`
+5. [Run tests](https://code.visualstudio.com/docs/editor/testing#_automatic-test-discovery-in-testing-view)
+6. Push your changes: `git push origin my-feature-branch`
+7. Create a pull request on GitHub
+8. Wait for a review
+
+#### 4.2 Desktop
+
+Install [make](https://www.gnu.org/software/make/), [Python3.11](https://www.python.org/), [venv](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/), [docker](https://docs.docker.com/engine/install/ubuntu/) and [nodejs](https://github.com/nodesource/distributions/tree/master).
+
+Run `make` for Makefile help. Initialize virtualenv and install dependencies with `make reinitialization` or `make bootstrap`. Test your changes with `make tests` or `make tests-fast`.
+
+You can lint with `make megalinter` (Incoming)
+
+If you need to run `build.sh` commands manually (instead of `make megalinter-build`), you need to run `source .venv/bin/activate` (or `source .venv/Scripts/activate` on Windows) first.
+
+### 5. Submit a pull request
+
+[Create a pull request](https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork) and [refer to the issue number](https://help.github.com/en/github/writing-on-github/autolinked-references-and-urls) using #123, where 123 is the issue number.
+
+### 6. Wait
+
+Your pull request will be reviewed, and you'll receive feedback. Thanks for contributing!
+
+Consider sponsoring the maintainer via [GitHub](https://github.com/sponsors/nvuillam).
+
+### With write access
+
+1. Clone the repository (only if you have write access)
+2. Create a new branch: `git checkout -b my-branch-name`
+3. Make your change
+4. Update **CHANGELOG.md** (the root one, not the one in /docs)
+5. Run `make megalinter-build` or `bash build.sh` to regenerate dockerfile from updated sources (run `make megalinter-build --doc` or `bash build.sh --doc` if you want to also regenerate documentation)
+6. Push and [submit a pull request][pr]
+7. Pat yourself on the back and wait for your pull request to be reviewed and merged.
+
+Maintainers with write access can also comment on pull requests with a command to run the build script on the PR, for example:
+
+```text
+/build
+```
+
+Available commands can be listed with the help command by posting the following comment:
+
+```text
+/help
+```
+
+Which returns:
+>
+> Command | Description
+> --- | ---
+> /build | Updates the Dockerfile, documentation, and other files from the yml descriptors
+> /build [ref=…] | Same as /build, but executes workflow in any branch using the ref named argument. The reference can be a branch, tag, or a commit SHA. This can be useful to test workflows in PR branches before merging.
+> /help | Returns this help message
+
+### Without write access
+
+1. [Fork][fork] and clone the repository
+2. Create a new branch: `git checkout -b my-branch-name`
+3. Make your change
+4. Update **CHANGELOG.md** (the root one, not the one in /docs)
+5. Run `make megalinter-build` or `bash build.sh` to regenerate dockerfile from updated sources (run `make megalinter-build --doc` or `bash build.sh --doc` if you want to also regenerate documentation)
+6. Push to your fork and [submit a pull request][pr]
+7. Pat your self on the back and wait for your pull request to be reviewed and merged.
+
+Here are a few things you can do that will increase the likelihood of your pull request being accepted:
+
+- Keep your change as focused as possible. If there are multiple changes you would like to make that aren't dependent upon each other, consider submitting them as separate pull requests.
+- Write [good commit messages](http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html).
+- Update [CHANGELOG.md](https://github.com/oxsecurity/megalinter/blob/main/CHANGELOG.md) to briefly describe your changes
+
+Draft pull requests are also welcome to get feedback early on, or if there is something blocking you.
+
+- Create a branch with a name that identifies the user and nature of the changes (similar to `user/branch-purpose`)
+- Open a pull request
+
+### Update Dockerfile base image
+
+1. `/Dockerfile` file has to be updated
+2. Run `make megalinter-build` or `bash build.sh`, and it will automatically propagate to all the other Dockerfiles
+
+### Managing Python Dependencies
+
+MegaLinter uses **uv** (fast Python package installer) and **hatch** (modern Python project manager) for dependency management.
+
+#### Adding a New Python Package
+
+1. **Add to pyproject.toml**: Add the package to the appropriate section in `pyproject.toml`:
+
+   - **Core dependencies**: Add to `dependencies` array
+   - **Optional dependencies**: Add to `[project.optional-dependencies]` sections (e.g., `huggingface`, `all-llm`)
+   - **Development dependencies**: Add to `.config/python/dev/requirements.txt`
+
+2. **Example - Adding a core dependency**:
+
+   ```toml
+   dependencies = [
+     "new-package>=1.0.0",  # Add your package here
+     "commentjson",
+     # ... other dependencies
+   ]
+   ```
+
+3. **Example - Adding an optional dependency**:
+
+   ```toml
+   [project.optional-dependencies]
+   huggingface = [
+     "langchain-huggingface",
+     "new-ai-package==2.1.0",  # Add your package here
+     "transformers",
+     "torch",
+   ]
+   ```
+
+4. **Update lock file**: Run `uv lock` to update `uv.lock` with the new dependencies
+
+5. **Install locally**: Run `make bootstrap` or `uv pip install -e .` to install the updated dependencies
+
+#### Upgrading Python Packages
+
+1. **Update version in pyproject.toml**: Change the version constraint
+
+   ```toml
+   "package-name>=2.0.0",  # Updated from 1.0.0
+   ```
+
+2. **Update lock file**: Run `uv lock` to resolve and lock new versions
+
+3. **Install updates**: Run `make python-venv-editable-install` or `uv pip install --upgrade -e .`
+
+#### Development Environment Commands
+
+- **Bootstrap environment**: `make bootstrap` (sets up venv, installs all dependencies)
+- **Install dev requirements**: `make python-bootstrap-dev`
+- **Install package in editable mode**: `make python-venv-editable-install`
+- **Upgrade pip**: `make python-venv-upgrade`
+- **Clean environment**: `make python-venv-purge`
+
+#### Using uv directly
+
+If you prefer using uv commands directly:
+
+```bash
+# Install dependencies
+uv pip install -r .config/python/dev/requirements.txt
+
+# Install project in editable mode
+uv pip install -e .
+
+# Add a new package
+uv add package-name
+
+# Upgrade packages
+uv pip install --upgrade package-name
+
+# Lock dependencies
+uv lock
+```
+
+#### Using hatch environments
+
+```bash
+# Install hatch (if not already installed)
+pip install pipx && pipx install hatch
+
+# Enter hatch shell
+hatch shell
+
+# Run commands in specific environments
+hatch run docs:serve  # Run docs server
+hatch run build:all   # Run build commands
+```
+
+**Important Notes**:
+
+- Always run `uv lock` after modifying `pyproject.toml` to update the lock file
+- Test your changes locally with `make tests-fast` before submitting PR
+- Update `CHANGELOG.md` when adding or upgrading significant dependencies
+
+### Improve documentation
+
+Apart from the descriptors, it will usually involve modifying files such as [.automation/build.py](https://github.com/oxsecurity/megalinter/blob/main/.automation/build.py)
+
+In order to be able to run locally a server that serves all the documentation and make the testing as real as possible you should setup a virtual environment.
+
+Commands to execute (only one time):
+
+```bash
+pip install pipx
+pipx install hatch
+hatch shell
+```
+
+Commands to run every time you want to build the docs and run the server:
+
+```bash
+hatch run build:serve
+```
+
+By default it listens on `http://127.0.0.1:8000/`.
+
+Every time a change is made to a `.md` file it will automatically update if the server is up.
+
+Once you think everything is correct run `make megalinter-build --doc` or  `bash build.sh --doc` and it will generate all the rest!
+
+### Add a new linter
+
+> **With Claude Code**: run `/add-linter [name]` for a guided, step-by-step workflow that handles the descriptor, fixtures, build, and changelog automatically.
+
+Each linter must:
+
+- Be defined in a descriptor file. Few properties are required ([see json schema documentation](https://megalinter.io/json-schemas/descriptor.html)), but please think to input doc URLs and `ide` section for documentation
+- Have two test files in `.automation/test`: one for success and one for failure
+
+Then run `make megalinter-build` or `bash build.sh` and it will generate all the rest!
+
+- Documentation (markdown)
+- Dockerfile (main and flavors)
+- Test classes
+- Configuration JSON schema
+- Online documentation menus
+
+![Screenshot](https://github.com/oxsecurity/megalinter/blob/main/docs/assets/images/ContributingAddLinter_1.jpg?raw=true>)
+
+### Execute the tests locally (Visual Studio Code)
+
+1. Install [Test Explorer UI](https://marketplace.visualstudio.com/items?itemName=hbenl.vscode-test-explorer) extension
+2. Install [Python Test Explorer for Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=LittleFoxTeam.vscode-python-test-adapter) extension
+3. Execute or debug tests via the side menu
+
+### Execute linter tests inside the container
+
+If you are creating a linter or making changes to a linter, you may want to run the tests to check that none of them fail.
+
+When running them, you may encounter several problems:
+
+* It's not installed on the machine locally and you don't want to install it.
+* The OS doesn't allow the installation of the linter because it's not cross-platform.
+* The behavior between running it on the local machine (host) and the container is different.
+
+For those cases, it's important to have the possibility to run the tests inside the container. To do so:
+
+1. Run `make megalinter-build` or `bash build.sh` to update the Dockerfile files of each linter.
+2. Execute the following commands in a ***.sh** script. Example:
+
+```bash
+#!/bin/sh
+
+# Taken from: https://megalinter.io/latest/supported-linters/
+LINTER="api_spectral"
+# If you want to build for ARM: linux/arm64
+PLATFORM=linux/amd64
+# If you want to run a specific test such as test_failure, set to: "${LINTER}_test and test_failure"
+TEST_KEYWORDS="${LINTER}_test"
+
+docker buildx build \
+  --platform $PLATFORM \
+  --file linters/$LINTER/Dockerfile \
+  --tag $LINTER \
+  .
+
+docker run \
+  --rm \
+  --env TEST_CASE_RUN=true \
+  --env OUTPUT_DETAIL=detailed \
+  --env TEST_KEYWORDS="${TEST_KEYWORDS}" \
+  --env MEGALINTER_VOLUME_ROOT="." \
+  --volume "/var/run/docker.sock:/var/run/docker.sock:rw" \
+  --volume "$(pwd):/tmp/lint" \
+  $LINTER
+```
+
+In the above example, it builds the **spectral** linter image and then runs its tests.
+
+### CI/CT/CD
+
+The **MegaLinter** has _CI/CT/CD_ configured utilizing **GitHub** Actions.
+
+- When a branch is created and code is pushed, a **GitHub** Action is triggered for building the new **Docker** container with the new codebase
+  - To test your updates during your development, you may have to create a draft Pull Request to trigger CI on the main repo
+  - During development, if all you updated is python code, you can write `quick build` in the commit message body to benefit from a quicker build (about 15 minutes): only python files are copied over oxsecurity/megalinter:test-YOURUSERNAME-YOURBRANCH or oxsecurity/megalinter:latest if a previous full run has not been performed yet
+  - You can [filter the performed tests](https://docs.pytest.org/en/stable/usage.html#specifying-tests-selecting-tests) by writing `TEST_KEYWORDS=my keywords` in the commit message body. Example: `TEST_KEYWORDS=kubernetes_kubeval_test`
+  - The last commit before the validation of a Pull Request must be a full build with all tests (about 45 minutes)
+- The **Docker** container is then ran against the _test cases_ to validate all code sanity
+  - `.automation/test` contains all test cases for each language that should be validated
+- These **GitHub** Actions utilize the Checks API and Protected Branches to help follow the SDLC
+- When the Pull Request is merged to main, the **MegaLinter** **Docker** container is then updated and deployed with the new codebase
+  - **Note:** The branch's **Docker** container is also removed from **DockerHub** to cleanup after itself
+
+## Releasing
+
+If you are the current maintainer of this action:
+
+1. If a major version number change: Update `README.md` and the wiki to reflect new version number in the example workflow file sections
+2. Draft [Releases](https://help.github.com/en/github/administering-a-repository/managing-releases-in-a-repository) are created automatically. They just need to be checked over for accuracy before making it official.
+3. Ensure you check the box for [publishing to the marketplace](https://help.github.com/en/actions/creating-actions/publishing-actions-in-github-marketplace#publishing-an-action)
+4. A GitHub Action will Publish the Docker image to GitHub Package Registry once a Release is created
+5. A GitHub Action will Publish the Docker image to Docker Hub once a Release is created
+6. Look for approval from [CODEOWNERS](https://help.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners)
+
+## Resources
+
+- [How to Contribute to Open Source](https://opensource.guide/how-to-contribute/)
+- [Using Pull Requests](https://help.github.com/articles/about-pull-requests/)
+- [GitHub Help](https://help.github.com)
+
+[pr]: https://github.com/oxsecurity/megalinter/compare
+[fork]: https://github.com/oxsecurity/megalinter/fork

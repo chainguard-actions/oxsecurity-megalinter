@@ -1,0 +1,194 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:recommended',
+    'customManagers:dockerfileVersions',
+    ':maintainLockFilesWeekly',
+    ':separateMultipleMajorReleases',
+    ':semanticCommits',
+    ':label(dependencies)',
+    ':configMigration',
+    ':combinePatchMinorReleases',
+    'security:minimumReleaseAgeNpm',
+    'preview:dockerVersions',
+    'group:unitTestNonMajor',
+    ':enableVulnerabilityAlerts',
+    ':automergePr', // Still raise a PR for automerges
+    ':automergeDigest', // enable for PRs updating digests
+    ':automergePatch', // enable for lock files, patch and pin
+  ],
+  vulnerabilityAlerts: {
+    enabled: true,
+  },
+  osvVulnerabilityAlerts: true,
+  hostRules: [
+    {
+      // repology.org is slow/flaky and frequently times out from the hosted runner.
+      // Without this, a repology ETIMEDOUT raises an ExternalHostError that aborts the
+      // whole repository run (Repository result: external-host-error), silently dropping
+      // all updates and Dependency Dashboard checkbox requests. Treat repology failures
+      // as a normal lookup miss instead of aborting the run.
+      matchHost: 'repology.org',
+      abortOnError: false,
+      timeout: 60000,
+    },
+  ],
+  packageRules: [
+    {
+      // js-yaml v5+ is ESM-only (dropped CommonJS). yeoman-environment loads the
+      // mega-linter-runner custom-flavor generator via require(), which cannot
+      // synchronously require() a pure-ESM js-yaml and fails with
+      // ERR_REQUIRE_ESM_RACE_CONDITION. Keep js-yaml on the v4 line (dual CJS/ESM).
+      matchPackageNames: [
+        'js-yaml',
+      ],
+      allowedVersions: '<5',
+    },
+    {
+      matchPackageNames: [
+        'uv',
+        'astral-sh/uv',
+        'ghcr.io/astral-sh/uv',
+      ],
+      schedule: [
+        'before 4am on Friday',
+      ],
+      matchUpdateTypes: [
+        'digest',
+        'patch',
+        'minor',
+        'major',
+      ],
+    },
+    {
+      groupName: 'Roslynator',
+      matchSourceUrls: [
+        'https://github.com/dotnet/roslynator',
+      ],
+      matchUpdateTypes: [
+        'digest',
+        'patch',
+        'minor',
+        'major',
+      ],
+    },
+    {
+      matchPackageNames: [
+        'hardisgroupcom/sfdx-hardis',
+      ],
+      schedule: [
+        'before 8am on Friday',
+      ],
+    },
+    {
+      matchPackageNames: [
+        'checkov',
+      ],
+      schedule: [
+        'before 10am every 4 day',
+      ],
+    },
+    {
+      groupName: 'langchain',
+      matchPackageNames: [
+        'langchain_*',
+        'langchain*',
+      ],
+      schedule: [
+        'before 3pm every 3 day',
+      ],
+      matchUpdateTypes: [
+        'digest',
+        'patch',
+        'minor',
+        'major',
+      ],
+    },
+    {
+      groupName: 'Salesforce packages',
+      matchPackageNames: [
+        '@salesforce/**',
+      ],
+      schedule: [
+        'before 4am every 4 day',
+      ],
+      matchUpdateTypes: [
+        'digest',
+        'patch',
+        'minor',
+        'major',
+      ],
+    },
+    {
+      // Keep the betterleaks linter and the secret-masking ruleset pin
+      // (megalinter/constants.py) in the same PR so they never drift apart
+      groupName: 'betterleaks',
+      matchPackageNames: [
+        'ghcr.io/betterleaks/betterleaks',
+        'betterleaks/betterleaks',
+      ],
+    },
+  ],
+  customManagers: [
+    {
+      customType: 'regex',
+      description: 'Update version inputs in GitHub Actions workflow files (e.g. trivy version)',
+      managerFilePatterns: [
+        '/(^|/)\\.github/workflows/.*\\.ya?ml$/',
+      ],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: registryUrl=(?<registryUrl>[^\\s]+?))?\\s+version: ["\']?(?<currentValue>[^"\'\\s]+)["\']?',
+      ],
+    },
+    {
+      customType: 'regex',
+      description: 'Update dockerfile sections in .megalinter-descriptor.yml files',
+      managerFilePatterns: [
+        '/(^|/).*\\.devcontainer(\\\\|/)Dockerfile$/',
+        '/(^|/).*\\.megalinter-descriptor\\.ya?ml$/',
+      ],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: registryUrl=(?<registryUrl>[^\\s]+?))?\\s(?:ENV|ARG)\\s+[A-Za-z0-9_]+?_VERSION[ =]["\']?(?<currentValue>.+?)["\']?\\s',
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: registryUrl=(?<registryUrl>[^\\s]+?))?\\s+(?:ENV|ARG)\\s+[A-Za-z0-9_]+?_VERSION[ =]["\']?(?<currentValue>.+?)["\']?\\s',
+      ],
+    },
+    {
+      customType: 'regex',
+      description: 'Update dependencies configured in constants.py file',
+      managerFilePatterns: [
+        '/(^|/).*megalinter(\\\\|/)constants\\.py$/',
+      ],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: registryUrl=(?<registryUrl>[^\\s]+?))?\\\\n(?:ENV|ARG)\\s+[A-Za-z0-9_]+?_VERSION[ =]["\']?(?<currentValue>.+?)["\']?,',
+      ],
+    },
+    {
+      customType: 'regex',
+      description: 'Update plain version constants in constants.py file',
+      managerFilePatterns: [
+        '/(^|/).*megalinter(\\\\|/)constants\\.py$/',
+      ],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: registryUrl=(?<registryUrl>[^\\s]+?))?\\s+[A-Z0-9_]+_VERSION\\s*=\\s*["\'](?<currentValue>[^"\']+)["\']',
+      ],
+    },
+    {
+      customType: 'regex',
+      description: 'Update dependencies configured with containerEnv in devcontainer.json file',
+      managerFilePatterns: [
+        '/(^|/).*\\.devcontainer(\\\\|/)devcontainer\\.json$/',
+      ],
+      matchStrings: [
+        '\/\/ renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: registryUrl=(?<registryUrl>[^\\s]+?))?\\s+["\']?[A-Za-z0-9_]+?["\']?:\\s["\']?(?<currentValue>.+?)["\']?\\s',
+      ],
+    },
+  ],
+  ignorePaths: [
+    '.automation/test/**',
+  ],
+  dockerfile: {
+    managerFilePatterns: [
+      '/^\\.automation/test/Dockerfile-megalinter-custom$/'
+    ]
+  }
+}

@@ -1,0 +1,112 @@
+---
+descriptor_id: SWIFT
+descriptor_type: language
+descriptor_flavors:
+  - cupcake
+  - swift
+file_extensions:
+  - ".swift"
+linters:
+  # Swift lint
+  - class: SwiftLintLinter
+    linter_name: swiftlint
+    linter_text: |
+      **SwiftLint** is the industry-standard linter and formatter for Swift code that enforces style guidelines and best practices based on the community-driven Swift Style Guide. It serves as an essential tool for maintaining high-quality, consistent Swift codebases.
+
+      **Key Features:**
+
+      - **Comprehensive Rule Set**: Over 200 built-in rules covering code style, performance, best practices, and potential bug detection
+      - **SourceKit Integration**: Leverages Apple's SourceKit for accurate AST-based analysis and precise error detection
+      - **Automatic Fixing**: Intelligent auto-correction for many rule violations, saving manual effort
+      - **Highly Configurable**: Extensive configuration options with support for enabling/disabling rules and custom severity levels
+      - **Custom Rules**: Support for project-specific custom rules using regular expressions and AST patterns
+      - **Xcode Integration**: Seamless integration with Xcode projects through build phases and scheme actions
+      - **Performance Optimized**: Fast analysis even for large Swift projects with incremental linting support
+      - **Multiple Output Formats**: Supports various report formats including JSON, HTML, and checkstyle for tool integration
+    linter_url: https://github.com/realm/SwiftLint
+    linter_repo: https://github.com/realm/SwiftLint
+    linter_rules_url: https://realm.github.io/SwiftLint/rule-directory.html
+    linter_rules_configuration_url: https://github.com/realm/SwiftLint#configuration
+    linter_rules_inline_disable_url: https://github.com/realm/SwiftLint#disable-rules-in-code
+    linter_spdx_license: MIT
+    active_only_if_file_found:
+      - ".swiftlint.yml"
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - file
+      - list_of_files
+      - project
+    cli_lint_extra_args:
+      - "lint"
+    cli_lint_extra_args_after:
+      - "--strict"
+    cli_lint_fix_arg_name: "--fix"
+    cli_lint_fix_remove_args:
+      - "lint"
+    config_file_name: ".swiftlint.yml"
+    cli_config_arg_name: ""
+    cli_help_arg_name: "--help"
+    cli_version_arg_name: "--version"
+    cli_lint_errors_count: regex_number
+    cli_lint_errors_regex: "Found ([0-9]+) violations"
+    common_linter_errors:
+      - identifier: SWIFT_SWIFTLINT_ERROR_INVALID_CONFIG
+        regex: "(Could not read configuration|Invalid configuration|YAML.*at line [0-9]+, column [0-9]+)"
+        message: |-
+          SwiftLint could not parse `.swiftlint.yml`.
+          Resolutions:
+            - Validate the YAML (indentation, quoting) — SwiftLint requires a strict YAML document.
+            - Verify every rule identifier under `opt_in_rules`, `disabled_rules`, and `only_rules` against `swiftlint rules` or the [rule directory](https://realm.github.io/SwiftLint/rule-directory.html).
+            - Check `included` / `excluded` paths are relative to the config file and exist in the repository.
+      - identifier: SWIFT_SWIFTLINT_ERROR_NO_LINTABLE_FILES
+        regex: "No lintable files found at paths"
+        message: |-
+          SwiftLint started but found no `.swift` files to analyse.
+          Resolutions:
+            - Check the `included:` / `excluded:` patterns in `.swiftlint.yml` — they may be filtering out every file.
+            - Confirm Swift files exist in the workspace and were not filtered out by `FILTER_REGEX_INCLUDE` / `FILTER_REGEX_EXCLUDE`.
+      - identifier: SWIFT_SWIFTLINT_ERROR_CUSTOM_RULE_REGEX
+        regex: "Invalid configuration for .* custom rule|regex .* is invalid"
+        message: |-
+          A `custom_rules` entry in `.swiftlint.yml` has an invalid regular expression or shape.
+          Resolutions:
+            - Test the `regex:` value with an NSRegularExpression-compatible tester.
+            - Ensure every custom rule has the required keys (`regex`, optional `name`/`message`/`severity`).
+    examples:
+      - "swiftlint lint --strict"
+      - "swiftlint --fix --strict"
+    install:
+      apk:
+        - unzip
+      dockerfile:
+        - |-
+          # renovate: datasource=github-releases depName=realm/SwiftLint
+          ARG SWIFT_SWIFTLINT_VERSION=0.65.0
+        # SwiftLint is installed from the fully static "swiftlint-static" binary
+        # (built with the Swift Static Linux SDK, musl-based) so it runs natively
+        # on the Alpine image without a Swift toolchain and without spawning a
+        # sibling Docker container. SourceKit-dependent rules are disabled in this
+        # binary and reported to the console when encountered.
+        - |-
+          RUN case "${TARGETARCH}" in \
+                amd64) SWIFTLINT_ARCH=amd64 ;; \
+                arm64) SWIFTLINT_ARCH=arm64 ;; \
+                *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
+              esac && \
+              curl -fsSL -o /tmp/swiftlint.zip \
+                "https://github.com/realm/SwiftLint/releases/download/${SWIFT_SWIFTLINT_VERSION}/swiftlint_linux_${SWIFTLINT_ARCH}.zip" && \
+              unzip -o /tmp/swiftlint.zip -d /tmp/swiftlint && \
+              install -m 0755 /tmp/swiftlint/swiftlint-static /usr/bin/swiftlint && \
+              rm -rf /tmp/swiftlint /tmp/swiftlint.zip
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+    ide:
+      idea:
+        - name: swiftlint
+          url: https://plugins.jetbrains.com/plugin/9175-swiftlint
+          id: com.appcodeplugins.swiftlint
+      xcode:
+        - name: Configure manually
+          url: https://github.com/realm/SwiftLint#xcode

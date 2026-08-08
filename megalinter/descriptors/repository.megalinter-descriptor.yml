@@ -1,0 +1,1220 @@
+---
+descriptor_id: REPOSITORY
+descriptor_type: other
+descriptor_flavors:
+  - all_flavors # Applicable to CI in any language project
+  - ci_light
+  - cupcake
+lint_all_files: true
+linters:
+  # CHECKOV
+  - class: CheckovLinter
+    linter_name: checkov
+    linter_text: |
+      **Checkov** is a comprehensive static code analysis tool for Infrastructure as Code (IaC) that prevents cloud security misconfigurations before they reach production.
+
+      **Key Features:**
+
+      - **Multi-Platform IaC Support**: Analyzes Terraform, CloudFormation, Kubernetes, Helm, ARM templates, Docker, Serverless, and more
+      - **Extensive Policy Library**: Over 1,000 built-in security and compliance policies covering CIS benchmarks, PCI-DSS, HIPAA, and other standards
+      - **Cloud Provider Coverage**: Comprehensive rules for AWS, Azure, GCP, Oracle Cloud, and Alibaba Cloud services
+      - **Security Focus**: Detects unencrypted storage, overly permissive security groups, missing logging, exposed secrets, and compliance violations
+      - **SARIF Output**: Modern security report format for integration with development platforms and security tools
+      - **Custom Policies**: Support for custom security policies written in Python or YAML for organization-specific requirements
+      - **Policy Suppression**: Granular control over policy enforcement with inline and configuration-based suppression
+      - **Graph-Based Analysis**: Advanced analysis using dependency graphs for complex infrastructure relationships
+
+      When another active linter of the same MegaLinter run is a dedicated secret scanner ([betterleaks](https://megalinter.io/latest/descriptors/repository_betterleaks/), [kingfisher](https://megalinter.io/latest/descriptors/repository_kingfisher/), [secretlint](https://megalinter.io/latest/descriptors/repository_secretlint/) or [trufflehog](https://megalinter.io/latest/descriptors/repository_trufflehog/)), MegaLinter automatically adds `--skip-framework secrets` to the checkov command, so the secrets scan is not duplicated. Define `--framework` or `--skip-framework` in `REPOSITORY_CHECKOV_ARGUMENTS` or in your checkov config file to override this behavior.
+    name: REPOSITORY_CHECKOV
+    can_output_sarif: true
+    descriptor_flavors:
+      - all_flavors # Applicable to CI in any language project
+      - cupcake
+      - terraform
+      - security
+    linter_url: https://www.checkov.io/
+    linter_repo: https://github.com/bridgecrewio/checkov
+    linter_speed: 2
+    linter_banner_image_url: https://raw.githubusercontent.com/bridgecrewio/checkov/25388a34231e09ac17b266ad9db0b4c0e806e956/docs/web/images/checkov-logo.svg
+    linter_icon_png_url: https://raw.githubusercontent.com/oxsecurity/megalinter/main/docs/assets/icons/linters/checkov.png
+    linter_rules_configuration_url: https://github.com/bridgecrewio/checkov#configuration-using-a-config-file
+    linter_rules_inline_disable_url: https://www.checkov.io/2.Basics/Suppressing%20and%20Skipping%20Policies.html
+    linter_rules_url: https://www.checkov.io/5.Policy%20Index/all.html
+    linter_megalinter_ref_url: "no"
+    linter_spdx_license: Apache-2.0
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - file
+      - list_of_files
+      - project
+    cli_lint_mode_file_extra_args_after:
+      - --file
+    cli_lint_mode_list_of_files_extra_args_after:
+      - --file
+    cli_lint_mode_project_exclude_arg_name: "--skip-path"
+    cli_lint_mode_project_exclude_config_key: "skip-path"
+    cli_lint_mode_project_extra_args_after:
+      - --directory
+      - .
+    cli_config_arg_name: "--config-file"
+    config_file_name: .checkov.yml
+    cli_sarif_args:
+      - --output
+      - sarif
+      - --output-file-path
+      - "{{REPORT_FOLDER}}"
+    sarif_default_output_file: results_sarif.sarif
+    cli_lint_errors_count: regex_sum
+    cli_lint_errors_regex: ", Failed checks: ([0-9]+), Skipped checks"
+    examples:
+      - "checkov --directory ."
+      - "checkov --directory . --output --sarif"
+    install:
+      # cargo:
+      #   - COMPILER_ONLY # Use COMPILER_ONLY fake package just to Dockerfile contains rust toolchain install
+      dockerfile:
+        - |-
+          # renovate: datasource=pypi depName=checkov
+          ARG PIP_CHECKOV_VERSION=3.3.9
+      pip:
+        - checkov==${PIP_CHECKOV_VERSION}
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+    test_folder: repository_checkov
+
+  # DEVSKIM
+  - class: DevskimLinter
+    linter_name: devskim
+    can_output_sarif: true
+    descriptor_flavors:
+      - all
+      - security
+    ignore_for_flavor_suggestions: true
+    linter_text: |
+      **DevSkim** is a security analysis tool that provides inline security guidance for developers by detecting security vulnerabilities and anti-patterns in source code.
+
+      **Key Features:**
+
+      - **Multi-Language Support**: Analyzes code in dozens of programming languages including C#, Java, JavaScript, Python, C/C++, and more
+      - **Comprehensive Rule Set**: Over 500 built-in security rules covering common vulnerabilities like injection flaws, cryptographic issues, and authentication problems
+      - **SARIF Output**: Modern security report format for integration with development platforms and security tools
+      - **Custom Rules**: Extensible rule engine allowing organizations to create custom security policies
+      - **Quick Fixes**: Automated remediation suggestions for many detected security issues
+      - **Severity Classification**: Categorizes findings by severity level to help prioritize security fixes
+      - **False Positive Management**: Configurable suppression system to reduce noise and focus on critical issues
+
+      If you need to ignore folders,files or file extensions, use glob expressions `Glob` property of local `.devskim.json` file
+
+      Example:
+
+      ```json
+      {
+        "Globs": [
+          "**/.git/**",
+          "**/megalinter-reports/**"
+        ]
+      }
+      ```
+    linter_url: https://github.com/microsoft/DevSkim
+    linter_repo: https://github.com/microsoft/DevSkim
+    linter_speed: 1
+    linter_rules_configuration_url: https://github.com/microsoft/DevSkim/wiki/Analyze-Command
+    linter_rules_ignore_config_url: https://github.com/microsoft/DevSkim/wiki/Analyze-Command
+    linter_image_url: https://github.com/microsoft/DevSkim/raw/main/media/devskim_logo.svg
+    linter_icon_png_url: https://raw.githubusercontent.com/oxsecurity/megalinter/main/docs/assets/icons/linters/devskim.png
+    linter_spdx_license: MIT
+    config_file_name: .devskim.json
+    cli_config_arg_name: "--options-json"
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - file
+      - list_of_files
+      - project
+    cli_lint_extra_args:
+      - analyze
+    cli_lint_mode_file_extra_args_after:
+      - -E
+      - --source-code
+    cli_lint_mode_list_of_files_extra_args_after:
+      - -E
+      - --source-code
+    cli_lint_mode_project_exclude_arg_name: "-g"
+    cli_lint_mode_project_exclude_arg_value: "**/{{DIR}}/**"
+    cli_lint_mode_project_exclude_separator: ","
+    cli_lint_mode_project_exclude_seed_values: ["**/.git/**", "**/bin/**"]
+    cli_lint_mode_project_exclude_config_key: "Globs"
+    cli_lint_mode_project_extra_args_after:
+      - -E
+      - --source-code
+      - .
+    cli_sarif_args:
+      - --file-format
+      - sarif
+    cli_help_arg_name: --help
+    cli_version_arg_name: --version
+    cli_lint_errors_count: sarif
+    cli_lint_warnings_count: sarif
+    common_linter_errors:
+      - identifier: REPOSITORY_DEVSKIM_ERROR_RULES_NOT_FOUND
+        regex: "Error: (No rules were loaded|Rules failed validation)"
+        message: |-
+          DevSkim could not load its rules. This usually means a custom rules path passed via `-r` / configuration is invalid, or the rule files at that path failed validation.
+          Resolutions:
+            - Remove or correct any custom rule paths in `.devskim.json` or the `-r` argument.
+            - Ensure custom rule files are committed to the repository, reachable from the workspace root, and conform to the DevSkim rule schema.
+    test_folder: devskim
+    examples:
+      - "devskim analyze --source-code ."
+      - "devskim analyze --file-format sarif --source-code ."
+      - "devskim analyze --file-format sarif --options-json config --source-code ."
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=nuget depName=Microsoft.CST.DevSkim.CLI
+          ARG REPOSITORY_DEVSKIM_VERSION=1.0.70
+        - RUN apk add --no-cache dotnet10-sdk && install -d /usr/local/dotnet-tools
+        - ENV PATH="${PATH}:/usr/local/dotnet-tools"
+        - RUN dotnet tool install --allow-roll-forward --tool-path /usr/local/dotnet-tools Microsoft.CST.DevSkim.CLI --version ${REPOSITORY_DEVSKIM_VERSION}
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+    ide:
+      vscode:
+        - name: VSCode DevSkim
+          url: https://marketplace.visualstudio.com/items?itemName=MS-CST-E.vscode-devskim
+  # DUSTILOCK
+  - class: DustilockLinter
+    linter_name: dustilock
+    linter_text: |
+      **Dustilock** is a dependency vulnerability scanner that analyzes your dependencies for known security vulnerabilities and checks if there are newer, safer versions available. It scans various dependency files (package.json, requirements.txt, etc.) and provides alerts about vulnerable packages in your project, helping you maintain secure dependencies by identifying outdated packages with known CVEs.
+
+      **Key Features:**
+
+      - **Multi-Package Manager Support**: Analyzes dependencies from npm, pip, composer, Maven, Gradle, and other popular package managers
+      - **Lock File Analysis**: Deep inspection of lock files to identify exact vulnerable versions and transitive dependencies
+      - **Real-Time Vulnerability Database**: Uses up-to-date vulnerability databases to detect the latest security issues
+      - **Supply Chain Security**: Identifies compromised or malicious packages in the dependency tree
+      - **SARIF Output**: Modern security report format for integration with development platforms and security tools
+      - **Detailed Reporting**: Comprehensive reports with vulnerability details, severity scores, and remediation guidance
+      - **Version Upgrade Suggestions**: Recommends safer, newer versions to resolve vulnerabilities
+      - **Transitive Dependency Analysis**: Scans both direct and indirect dependencies for comprehensive coverage
+      - **Policy Enforcement**: Configurable security policies to block builds with critical vulnerabilities
+    can_output_sarif: true
+    descriptor_flavors:
+      - all
+      - security
+    ignore_for_flavor_suggestions: true
+    linter_url: https://github.com/Checkmarx/dustilock
+    linter_repo: https://github.com/Checkmarx/dustilock
+    linter_banner_image_url: https://user-images.githubusercontent.com/1287098/142776854-83abf265-a1ba-485f-a8b6-995da7f7ef8b.png
+    linter_icon_png_url: https://raw.githubusercontent.com/oxsecurity/megalinter/main/docs/assets/icons/linters/dustilock.png
+    linter_spdx_license: Apache-2.0
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - project
+    cli_lint_mode_project_extra_args_after:
+      - --recursive
+    cli_lint_errors_count: regex_count
+    cli_lint_errors_regex: "(error )"
+    linter_version_cache: "1.2.0"
+    test_folder: dustilock
+    examples:
+      - "dustilock"
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=github-tags depName=checkmarx/dustilock
+          ARG REPOSITORY_DUSTILOCK_VERSION=1.2.0
+        - |-
+          # renovate: datasource=docker depName=golang versioning=semver
+          ARG GO_IMAGE_VERSION=1.26.5
+        # The golang image used as a builder is a temporary workaround
+        # Dustilock is not released as a binary or container
+        - |-
+          FROM golang:${GO_IMAGE_VERSION}-alpine AS dustilock
+          ARG REPOSITORY_DUSTILOCK_VERSION
+          RUN GOBIN=/usr/bin go install github.com/checkmarx/dustilock@v${REPOSITORY_DUSTILOCK_VERSION}
+        - COPY --link --from=dustilock /usr/bin/dustilock /usr/bin/dustilock
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+  # GIT_DIFF
+  - linter_name: git_diff
+    lint_all_files: true
+    test_folder: git_diff
+    linter_text: |
+      **git diff** is a conflict detection checker that scans files for Git conflict markers and other merge-related issues that may have been inadvertently left in the codebase after resolving merge conflicts.
+
+      **Key Features:**
+
+      - **Conflict Marker Detection**: Identifies Git conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) that weren't properly resolved
+      - **Merge Safety**: Prevents accidentally committing unresolved merge conflicts to version control
+      - **Repository Hygiene**: Helps maintain clean codebases by catching leftover merge artifacts
+      - **Fast Scanning**: Efficiently processes files to detect problematic patterns without performance overhead
+    linter_url: https://git-scm.com
+    linter_repo: https://github.com/git/git
+    linter_speed: 5
+    linter_spdx_license: LGPL-2.1
+    linter_megalinter_ref_url: never
+    cli_config_arg_name: ""
+    cli_executable: git
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - project
+    cli_lint_extra_args:
+      - "diff"
+      - "--check"
+    cli_help_arg_name: "--help"
+    examples:
+      - "git diff --check"
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+  # BETTERLEAKS
+  - class: BetterleaksLinter
+    linter_name: betterleaks
+    can_output_sarif: true
+    descriptor_flavors:
+      - all_flavors # Applicable to CI in any language project
+      - ci_light
+      - cupcake
+      - security
+    linter_url: https://github.com/betterleaks/betterleaks
+    linter_repo: https://github.com/betterleaks/betterleaks
+    linter_speed: 4
+    linter_spdx_license: MIT
+    linter_rules_configuration_url: https://github.com/betterleaks/betterleaks#configuration
+    linter_rules_ignore_config_url: https://github.com/betterleaks/betterleaks#betterleaksignore
+    linter_rules_inline_disable_url: https://github.com/betterleaks/betterleaks#betterleaksallow
+    linter_icon_png_url: https://raw.githubusercontent.com/oxsecurity/megalinter/main/docs/assets/icons/linters/betterleaks.png
+    linter_text: |
+      **betterleaks** is a next-generation SAST tool for detecting and preventing secrets like passwords, API keys, and tokens in git repositories and filesystems. Created by the author of gitleaks, betterleaks delivers significantly higher recall (98.6% vs 70.4% on the CredData benchmark), lower false-positive rates, and 4–5× faster scanning.
+
+      **Key Features:**
+
+      - **BPE-based detection** using cl100k_base tokenization instead of Shannon entropy, dramatically reducing false positives on UUIDs, Base64 strings, and hashes
+      - **Full git history scanning** including all branches and commits, plus filesystem-only mode
+      - **Live secret validation** via CEL-based async HTTP requests per rule
+      - **Custom rule support** using CEL (Common Expression Language) filter expressions
+      - **Automatic encoding handling** — recursively decodes base64, hex, unicode, and nested archives
+      - **Multiple output formats** including JSON, SARIF, and custom Go templates
+      - **Backward compatible** — reads existing `.gitleaks.toml` and `.gitleaksignore` files
+      - **Pre-commit hook integration** to prevent secrets from being committed
+      - **Baseline support** to ignore known secrets while catching new ones
+      - **Pure Go** — no CGO or Hyperscan dependency, runs on any modern OS/arch
+
+      ## Scan only Pull Request commits
+
+      `VALIDATE_ALL_CODEBASE: false` doesn't make betterleaks analyze only updated files. To analyze only commits on a Pull Request, set `VALIDATE_ALL_CODEBASE: false` together with `REPOSITORY_BETTERLEAKS_PR_COMMITS_SCAN: true`; this only works for select platforms:
+
+      - GitHub Actions
+      - Azure Pipelines
+      - GitLab Pipelines (Merge Requests and External Pull Requests — Premium/Ultimate only)
+
+      You can also set the following MegaLinter environment variables manually:
+
+      - `PULL_REQUEST=true`
+      - `REPOSITORY_BETTERLEAKS_PR_COMMITS_SCAN: true`
+      - `REPOSITORY_BETTERLEAKS_PR_SOURCE_SHA` with the last commit SHA from your PR
+      - `REPOSITORY_BETTERLEAKS_PR_TARGET_SHA` with the target branch commit SHA
+
+      ## Migration from gitleaks
+
+      `REPOSITORY_GITLEAKS` was removed in MegaLinter v10. betterleaks reads your existing `.gitleaks.toml` configuration and `.gitleaksignore` files unchanged, so no configuration changes are needed to migrate.
+    config_file_name: .betterleaks.toml
+    cli_config_arg_name: "-c"
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - file
+      - list_of_files
+      - project
+    cli_lint_extra_args_after:
+      - dir
+    cli_lint_mode_project_extra_args_after:
+      - "."
+    cli_lint_extra_args:
+      - --redact
+      - --verbose
+    cli_sarif_args:
+      - --report-format
+      - sarif
+      - --report-path
+      - "{{SARIF_OUTPUT_FILE}}"
+    cli_help_arg_name: --help
+    cli_version_arg_name: version
+    ignore_file_name: .betterleaksignore
+    cli_lint_errors_count: regex_sum
+    cli_lint_errors_regex: "leaks found: ([0-9]+)"
+    test_folder: betterleaks
+    examples:
+      - "betterleaks dir ."
+      - "betterleaks git ."
+      - "betterleaks dir -c .betterleaks.toml --redact ."
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=docker depName=ghcr.io/betterleaks/betterleaks
+          ARG REPOSITORY_BETTERLEAKS_VERSION=v1.7.3
+        - FROM ghcr.io/betterleaks/betterleaks:${REPOSITORY_BETTERLEAKS_VERSION} AS betterleaks
+        - COPY --link --from=betterleaks /usr/bin/betterleaks /usr/bin/
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+    variables:
+      - name: REPOSITORY_BETTERLEAKS_PR_COMMITS_SCAN
+        description: Scan only commits in the current Pull Request/Merge Request
+        default_value: "false"
+      - name: REPOSITORY_BETTERLEAKS_PR_SOURCE_SHA
+        description: Source commit SHA of the Pull Request/Merge Request
+        default_value: ""
+      - name: REPOSITORY_BETTERLEAKS_PR_TARGET_SHA
+        description: Target commit SHA of the Pull Request/Merge Request
+        default_value: ""
+
+  # GRYPE
+  - class: GrypeLinter
+    linter_name: grype
+    linter_text: |
+      **Grype** is a comprehensive vulnerability scanner for container images and filesystems that quickly identifies known security vulnerabilities in packages and dependencies. It serves as an essential tool for supply chain security by detecting CVEs across multiple vulnerability databases.
+
+      **Key Features:**
+
+      - **Multi-Source Scanning**: Analyzes container images, directories, SBOM files, and archives for comprehensive vulnerability coverage
+      - **Extensive Database Coverage**: Leverages multiple vulnerability databases including NVD, Alpine SecDB, Ubuntu, Debian, and more
+      - **Package Manager Support**: Detects vulnerabilities in packages from npm, pip, gem, Maven, Go modules, and other popular package managers
+      - **SARIF Output**: Modern security report format for integration with development platforms and security tools
+      - **Container Registry Integration**: Direct scanning of images from Docker Hub, ECR, GCR, and other container registries
+      - **SBOM Analysis**: Can analyze Software Bill of Materials files for vulnerability assessment
+      - **CI/CD Ready**: Designed for integration into continuous integration pipelines with configurable failure thresholds
+      - **Detailed Reporting**: Comprehensive vulnerability reports with CVSS scores, severity levels, and remediation guidance
+      - **Fast Performance**: Optimized scanning engine suitable for large-scale container and filesystem analysis
+      - **Offline Support**: Can operate with cached vulnerability databases for air-gapped environments
+    can_output_sarif: true
+    descriptor_flavors:
+      - all_flavors # Applicable to CI in any language project
+      - ci_light
+      - cupcake
+      - security
+    linter_speed: 2
+    linter_url: https://github.com/anchore/grype
+    linter_repo: https://github.com/anchore/grype
+    linter_rules_url: https://github.com/anchore/grype#vulnerability-summary
+    linter_banner_image_url: https://user-images.githubusercontent.com/5199289/136855393-d0a9eef9-ccf1-4e2b-9d7c-7aad16a567e5.png
+    linter_icon_png_url: https://raw.githubusercontent.com/oxsecurity/megalinter/main/docs/assets/icons/linters/grype.png
+    linter_rules_configuration_url: https://github.com/anchore/grype#configuration
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - file
+      # https://github.com/anchore/grype/issues/562
+      #- list_of_files
+      - project
+    cli_lint_mode_file_extra_args_after:
+      - file:{{FILE}}
+    cli_lint_mode_project_exclude_arg_name: "--exclude"
+    cli_lint_mode_project_exclude_arg_value: "**/{{DIR}}"
+    cli_lint_mode_project_exclude_config_key: "exclude"
+    cli_lint_mode_project_extra_args_after:
+      - dir:.
+    cli_config_arg_name: "--config"
+    config_file_name: .grype.yaml
+    cli_sarif_args:
+      - --output
+      - sarif
+    cli_version_arg_name: version
+    cli_lint_errors_count: regex_count
+    cli_lint_errors_regex: "(Low|Medium|High|Critical)"
+    common_linter_errors:
+      - identifier: REPOSITORY_GRYPE_ERROR_DB_UPDATE_FAILED
+        regex: "unable to (update|check for) vulnerability database( update)?"
+        message: |-
+          grype could not update its vulnerability database (network, TLS, or CDN issue talking to grype.anchore.io).
+          This is an environment issue, not a vulnerability finding.
+          Workarounds:
+            - Retry the run later (issue is often transient).
+            - Pre-populate the grype DB in a cached layer / volume in CI.
+            - Temporarily mark the linter as non-blocking by adding to your .mega-linter.yml:
+                DISABLE_ERRORS_LINTERS:
+                  - REPOSITORY_GRYPE
+      - identifier: REPOSITORY_GRYPE_ERROR_DB_CORRUPT
+        regex: "(vulnerability database is (corrupt|invalid)|database (disk image is malformed|metadata not found))"
+        message: |-
+          grype's local vulnerability database is corrupt or incomplete.
+          Resolutions:
+            - In a long-lived environment, run `grype db delete && grype db update`.
+            - In CI, clear any cached `~/.cache/grype` directory and re-run.
+      - identifier: REPOSITORY_GRYPE_ERROR_TLS_TIMEOUT
+        regex: "net/http: TLS handshake timeout"
+        message: |-
+          grype timed out during the TLS handshake while downloading the database listing or release info.
+          This is a transient network issue. Retry the run, or set up a self-hosted DB mirror for reliability.
+    examples:
+      - "grype dir:."
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=github-tags depName=anchore/grype
+          ARG REPOSITORY_GRYPE_VERSION=0.116.1
+        - RUN curl -sSfL https://raw.githubusercontent.com/anchore/grype/refs/tags/v${REPOSITORY_GRYPE_VERSION}/install.sh | sh -s -- -b /usr/local/bin
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+    test_folder: repository_grype
+
+  # LS-LINT
+  - class: LsLintLinter
+    linter_name: ls-lint
+    linter_text: |
+      **ls-lint** is an extremely fast file and directory name linter that helps maintain consistent naming conventions across your project. It validates file and directory names against configurable rules to enforce naming patterns, prevent problematic characters, and ensure cross-platform compatibility.
+
+      **Key Features:**
+
+      - **Lightning Fast Performance**: Written in Go for extremely fast scanning of large directory structures and file systems
+      - **Configurable Rules**: Flexible YAML configuration supporting regex patterns, case conventions, and custom naming rules
+      - **Cross-Platform Compatibility**: Prevents naming conflicts between different operating systems (Windows, macOS, Linux)
+      - **Multiple Naming Conventions**: Built-in support for camelCase, PascalCase, snake_case, kebab-case, and custom patterns
+      - **Directory Structure Validation**: Enforces consistent naming across both files and directory hierarchies
+      - **Zero Dependencies**: Standalone binary with no external dependencies for easy installation and deployment
+      - **Globbing Support**: Advanced pattern matching for applying different rules to specific file types or directories
+      - **Team Collaboration**: Ensures consistent naming conventions across large development teams and projects
+      - **Error Prevention**: Catches naming issues early to prevent problems with case-sensitive filesystems and tools
+    linter_url: https://ls-lint.org/
+    linter_repo: https://github.com/loeffel-io/ls-lint
+    linter_rules_url: https://ls-lint.org/2.2/configuration/the-rules.html
+    linter_banner_image_url: https://raw.githubusercontent.com/loeffel-io/ls-lint/master/assets/logo/ls-lint.png
+    active_only_if_file_found:
+      - ".ls-lint.yml"
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - file
+      - list_of_files
+      - project
+    cli_config_arg_name: "--config"
+    config_file_name: ".ls-lint.yml"
+    examples:
+      - "ls-lint"
+      - "ls-lint --workdir src"
+    test_folder: repository_file
+    cli_lint_errors_count: "total_lines"
+    common_linter_errors:
+      - identifier: REPOSITORY_LS_LINT_ERROR_CONFIG_INVALID
+        regex: "(yaml: (unmarshal errors|line [0-9]+:)|cannot unmarshal|rule [a-zA-Z_-]+ not exists)"
+        message: |-
+          ls-lint could not parse `.ls-lint.yml`. The YAML is malformed or references an unknown naming rule.
+          Resolutions:
+            - Validate the YAML syntax of `.ls-lint.yml`.
+            - Check that each rule (e.g. `camelCase`, `snake_case`, `regex:...`) is supported by the installed ls-lint version.
+    install:
+      apk:
+        - curl
+      dockerfile:
+        - |-
+          # renovate: datasource=github-releases depName=loeffel-io/ls-lint extractVersion=^v(?<version>.+)$
+          ARG REPOSITORY_LS_LINT_VERSION=2.3.1
+        - |-
+          RUN set -eu; \
+              case "$TARGETPLATFORM" in \
+                linux/amd64) ARCH=amd64 ;; \
+                linux/arm64) ARCH=arm64 ;; \
+                *) echo "unsupported platform: $TARGETPLATFORM" >&2; exit 1 ;; \
+              esac; \
+              curl --retry 5 --retry-delay 5 -fsSL -o /usr/bin/ls-lint \
+                "https://github.com/loeffel-io/ls-lint/releases/download/v${REPOSITORY_LS_LINT_VERSION}/ls-lint-linux-${ARCH}" && \
+              chmod +x /usr/bin/ls-lint
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+
+  # OSV-SCANNER
+  - class: OsvScannerLinter
+    linter_name: osv-scanner
+    name: REPOSITORY_OSV_SCANNER
+    can_output_sarif: false # disabled until it works !
+    descriptor_flavors:
+      - all_flavors # Applicable to CI in any language project
+      - ci_light
+      - cupcake
+      - security
+    linter_speed: 2
+    linter_text: |
+      **OSV-Scanner** is a dependency vulnerability scanner from Google that detects known vulnerabilities in open-source dependencies by matching project manifests and lock files against the OSV database.
+
+      **Key Features:**
+
+      - **Broad ecosystem support**: Scans dependencies from multiple package managers and lockfile formats
+      - **Source project scanning**: Recursively scans source directories for vulnerable packages
+      - **SARIF output**: Exports findings in SARIF format for CI and security platform integrations
+      - **Configurable behavior**: Supports repository-level configuration using `osv-scanner.toml`
+      - **Reliable vulnerability data**: Uses OSV.dev vulnerability records maintained by the open source security community
+      - **Fast CI usage**: Designed for automated security checks in pipelines and pre-commit workflows
+    linter_url: https://google.github.io/osv-scanner/
+    linter_repo: https://github.com/google/osv-scanner
+    linter_spdx_license: Apache-2.0
+    linter_rules_configuration_url: https://google.github.io/osv-scanner/configuration/
+    linter_rules_ignore_config_url: https://google.github.io/osv-scanner/usage/scan-source#ignored-files
+    config_file_name: osv-scanner.toml
+    cli_config_arg_name: --config
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - file
+      - list_of_files
+      - project
+    cli_lint_extra_args:
+      - scan
+      - source
+    cli_lint_mode_project_exclude_arg_name: "--experimental-exclude"
+    cli_lint_mode_project_extra_args_after:
+      - --recursive
+      - .
+    cli_sarif_args:
+      - --format
+      - sarif
+    cli_help_arg_name: --help
+    help_command_return_code: 127
+    cli_version_arg_name: --version
+    cli_lint_errors_count: regex_count
+    cli_lint_errors_regex: "(osv\\.dev/GHSA-)"
+    common_linter_errors:
+      - identifier: REPOSITORY_OSV_SCANNER_ERROR_SERVICE_UNAVAILABLE
+        regex: "rpc error: code = Unavailable"
+        message: |-
+          osv-scanner could not reach the deps.dev / OSV transitive-dependency resolution service (gRPC "service unavailable").
+          This is a transient remote service issue, not a vulnerability finding.
+          Workarounds:
+            - Retry the run later.
+            - Temporarily mark the linter as non-blocking by adding to your .mega-linter.yml:
+                DISABLE_ERRORS_LINTERS:
+                  - REPOSITORY_OSV_SCANNER
+      - identifier: REPOSITORY_OSV_SCANNER_ERROR_NO_PACKAGE_SOURCES
+        regex: "(?i)no package sources found"
+        message: |-
+          osv-scanner found no lockfiles, manifests, or SBOMs to scan in the repository.
+          This is a configuration/scope issue, not a vulnerability finding.
+          Resolutions:
+            - Verify the repository actually contains a supported lockfile (package-lock.json, go.sum, Gemfile.lock, Pipfile.lock, etc.) at the scanned path.
+            - If this is expected for some sub-projects, disable osv-scanner for the affected paths or mark it non-blocking via `DISABLE_ERRORS_LINTERS`.
+      - identifier: REPOSITORY_OSV_SCANNER_ERROR_LOCKFILE_PARSE
+        regex: "(?i)failed to parse (lockfile|sbom)"
+        message: |-
+          osv-scanner failed to parse a lockfile or SBOM. The file is likely malformed or in an unsupported format/version.
+          Resolutions:
+            - Regenerate the lockfile with the project's package manager.
+            - For SBOMs, ensure the CycloneDX/SPDX version is supported by the current osv-scanner release.
+    test_folder: repository_osv_scanner
+    examples:
+      - "osv-scanner scan source --recursive ."
+      - "osv-scanner scan source --format sarif --output-file report.sarif --recursive ."
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=repology depName=alpine_3_24/osv-scanner versioning=loose
+          ARG REPOSITORY_OSV_SCANNER_VERSION=2.3.8-r1
+        - |-
+          RUN apk add --no-cache \
+              osv-scanner=${REPOSITORY_OSV_SCANNER_VERSION}
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+
+  # SECRETLINT
+  - class: SecretLintLinter
+    linter_name: secretlint
+    can_output_sarif: true
+    descriptor_flavors:
+      - all_flavors # Applicable to CI in any language project
+      - ci_light
+      - cupcake
+      - security
+    linter_speed: 1
+    linter_text: |
+      **SecretLint** is a comprehensive secrets detection tool that prevents sensitive information like API keys, passwords, and tokens from being committed to version control. It provides pluggable architecture with extensive rule sets for detecting various types of secrets across different platforms and services.
+
+      **Key Features:**
+
+      - **Extensive Rule Library**: Built-in detection for AWS, GitHub, Slack, Google, and dozens of other service credentials
+      - **Pluggable Architecture**: Modular rule system allowing custom secret patterns and organization-specific detection
+      - **Multiple Output Formats**: Supports JSON, SARIF, and other formats for integration with security tools and platforms
+      - **Configuration Flexibility**: Highly configurable with support for custom rules, ignore patterns, and severity levels
+      - **Ignore System**: Sophisticated ignore patterns for managing false positives and legacy secrets
+      - **Team Collaboration**: Shared configuration files ensure consistent secret detection across development teams
+      - **Performance Optimized**: Fast scanning suitable for large repositories and automated workflows
+      - **Open Source**: Community-driven with transparent detection rules and continuous updates
+    linter_url: https://github.com/secretlint/secretlint
+    linter_repo: https://github.com/secretlint/secretlint
+    linter_banner_image_url: https://github.com/secretlint/secretlint/raw/master/docs/assets/SecretLintLP.png
+    linter_icon_png_url: https://raw.githubusercontent.com/oxsecurity/megalinter/main/docs/assets/icons/linters/secretlint.png
+    linter_rules_url: https://github.com/secretlint/secretlint#rule-packages
+    linter_rules_configuration_url: https://github.com/secretlint/secretlint#configuration
+    linter_rules_ignore_config_url: https://github.com/secretlint/secretlint/blob/master/docs/configuration.md#secretlintignore
+    linter_megalinter_ref_url: https://github.com/secretlint/secretlint#mega-linter
+    config_file_name: .secretlintrc.json
+    cli_config_arg_name: "--secretlintrc"
+    ignore_file_name: .secretlintignore
+    cli_lint_ignore_arg_name: --secretlintignore
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - file
+      - list_of_files
+      - project
+    cli_lint_extra_args_after:
+      # secretlint v13 introduced a ripgrep-based file walker that respects
+      # .gitignore by default. --no-gitignore keeps the v12 scan breadth (scan
+      # everything, filter only via .secretlintignore). The .secretlintignore
+      # itself (which excludes .automation/test fixtures containing intentional
+      # fake secrets) is applied via SecretLintLinter.get_ignore_arguments,
+      # which passes it by base name because the v13 walker matches ignore
+      # files by base name and drops an absolute path.
+      # See https://github.com/secretlint/secretlint/releases (v13)
+      - "--no-gitignore"
+    cli_lint_mode_project_exclude_ignore_file_arg_name: "--secretlintignore"
+    cli_lint_mode_project_exclude_ignore_file_seed_files: [".secretlintignore", ".gitignore"]
+    cli_lint_mode_project_exclude_workspace_file_name: ".megalinter-secretlintignore"
+    cli_lint_mode_project_extra_args_after:
+      - "**/*"
+    cli_sarif_args:
+      - --format
+      - "@secretlint/secretlint-formatter-sarif"
+    cli_help_arg_name: "--help"
+    test_folder: credentials
+    examples:
+      - 'secretlint "*/**"'
+      - 'secretlint --secretlintrc .secretlintrc.json "**/*"'
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=npm depName=secretlint
+          ARG NPM_SECRETLINT_VERSION=13.0.4
+        - |-
+          # renovate: datasource=npm depName=@secretlint/secretlint-rule-preset-recommend
+          ARG NPM_SECRETLINT_SECRETLINT_RULE_PRESET_RECOMMEND_VERSION=13.0.4
+        - |-
+          # renovate: datasource=npm depName=@secretlint/secretlint-formatter-sarif
+          ARG NPM_SECRETLINT_SECRETLINT_FORMATTER_SARIF_VERSION=13.0.4
+      npm:
+        - secretlint@${NPM_SECRETLINT_VERSION}
+        - "@secretlint/secretlint-rule-preset-recommend@${NPM_SECRETLINT_SECRETLINT_RULE_PRESET_RECOMMEND_VERSION}"
+        - "@secretlint/secretlint-formatter-sarif@${NPM_SECRETLINT_SECRETLINT_FORMATTER_SARIF_VERSION}"
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+  # SEMGREP
+  - class: SemgrepLinter
+    linter_name: semgrep
+    can_output_sarif: true
+    descriptor_flavors:
+      - all_flavors # Applicable to CI in any language project
+      - cupcake
+      - security
+    linter_url: https://semgrep.dev/
+    linter_repo: https://github.com/returntocorp/semgrep
+    linter_speed: 1
+    linter_text: |
+      **Semgrep** is a fast, AI-powered static analysis tool that finds bugs, detects security vulnerabilities, and enforces code standards across 30+ programming languages and frameworks. Unlike traditional SAST tools, Semgrep provides high-confidence findings with minimal false positives.
+
+      **Key Features:**
+
+      - **Multi-Language Support**: Comprehensive analysis for 30+ languages including Python, JavaScript, Java, Go, C/C++, and more
+      - **High-Precision Analysis**: AI-powered noise filtering reduces false positives by up to 98% compared to traditional SAST tools
+      - **Security-Focused**: Built-in rulesets for OWASP Top 10, CWE vulnerabilities, and framework-specific security patterns
+      - **Custom Rule Engine**: Simple, code-like syntax for writing custom rules that match your organization's coding standards
+      - **Lightning Fast**: Median CI scan time of 10 seconds, designed for developer workflow integration
+      - **Extensive Rule Registry**: Thousands of community and expert-maintained rules covering security, correctness, and performance
+      To use SemGrep in MegaLinter you must define a list of rulesets to use.
+      Example: `REPOSITORY_SEMGREP_RULESETS: ["p/docker-compose","p/owasp-top-ten"]`
+      Exception for standalone and security flavors docker images, that use a list of security rulesets by default.
+    linter_rules_url: https://semgrep.dev/r
+    linter_rules_configuration_url: https://semgrep.dev/docs/running-rules/
+    linter_rules_inline_disable_url: https://semgrep.dev/docs/ignoring-findings/#inline-comments
+    linter_rules_ignore_config_url: https://semgrep.dev/docs/ignoring-files-folders-code/#defining-files-and-folders-in-semgrepignore
+    linter_banner_image_url: https://raw.githubusercontent.com/returntocorp/semgrep/develop/semgrep.svg
+    linter_icon_png_url: https://raw.githubusercontent.com/oxsecurity/megalinter/main/docs/assets/icons/linters/semgrep.png
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - file
+      - list_of_files
+      - project
+    cli_config_arg_name: --config
+    cli_config_default_value: auto
+    ignore_file_name: .semgrepignore
+    cli_lint_extra_args:
+      - --error # Exit 1 when errors are found
+    cli_lint_mode_project_exclude_arg_name: "--exclude"
+    cli_lint_mode_project_extra_args_after:
+      - "{{WORKSPACE}}"
+    # cli_lint_fix_arg_name: --autofix # Disable for now as some "fixes" are actually breaking ML code
+    cli_sarif_args:
+      - --sarif
+      - --output
+      - "{{SARIF_OUTPUT_FILE}}"
+    cli_help_arg_name: -h
+    cli_help_extra_args: ["--help"]
+    cli_lint_errors_count: regex_number
+    cli_lint_errors_regex: "files: ([0-9]+) finding"
+    test_folder: repository_semgrep
+    examples:
+      - "semgrep /tmp/lint"
+      - "semgrep "
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=pypi depName=semgrep
+          ARG PIP_SEMGREP_VERSION=1.172.0
+        - |-
+          # Wrap semgrep so its OCaml 5 runtime does not abort with
+          # "Failed to allocate signal stack for domain 0", which happens when the
+          # stack rlimit is unlimited (the case on some CI runners). Cap it to a
+          # finite value only when unlimited, leaving an already-bounded limit untouched.
+          RUN mv /venvs/semgrep/bin/semgrep /venvs/semgrep/bin/semgrep-bin \
+              && printf '#!/bin/sh\\ncase "$(ulimit -s)" in unlimited) ulimit -s 65536 ;; esac\\nexec /venvs/semgrep/bin/semgrep-bin "$@"\\n' > /venvs/semgrep/bin/semgrep \
+              && chmod +x /venvs/semgrep/bin/semgrep
+      pip:
+        - semgrep==${PIP_SEMGREP_VERSION}
+    variables:
+      - name: REPOSITORY_SEMGREP_RULESETS
+        description: List of semgrep rulesets identifiers that you want to enforce
+        default_value: auto
+      - name: REPOSITORY_SEMGREP_RULESETS_TYPE
+        description: "MegaLinter semgrep ruleset list preset id . Available values: security"
+        default_value: ""
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+    ide:
+      vscode:
+        - name: VSCode SemGrep
+          url: https://marketplace.visualstudio.com/items?itemName=semgrep.semgrep
+  # SYFT
+  - class: SyftLinter
+    linter_name: syft
+    can_output_sarif: true
+    is_sbom: true
+    descriptor_flavors:
+      - all_flavors # Applicable to CI in any language project
+      - ci_light
+      - cupcake
+      - security
+    ignore_for_flavor_suggestions: true
+    linter_url: https://github.com/anchore/syft
+    linter_repo: https://github.com/anchore/syft
+    linter_text: |
+      **Syft** is a comprehensive Software Bill of Materials (SBOM) generation tool that creates detailed inventories of software components and dependencies in your projects. It serves as an essential tool for software supply chain security and compliance management.
+
+      **Key Features:**
+
+      - **Multi-Format SBOM Generation**: Creates SBOMs in SPDX, CycloneDX, and Syft native formats for maximum compatibility
+      - **Extensive Ecosystem Support**: Analyzes container images, filesystems, archives, and source code across multiple programming languages
+      - **Language Coverage**: Supports packages from npm, pip, gems, Java/Maven/Gradle, Go modules, .NET, and many more
+      - **Container Analysis**: Deep inspection of container images including OS packages and application dependencies
+      - **Fast Scanning**: High-performance analysis suitable for CI/CD pipelines and large codebases
+      - **Flexible Output**: Multiple output formats including JSON, XML, and human-readable tables
+      - **Supply Chain Visibility**: Provides complete transparency into software components and their origins
+      - **Compliance Ready**: Supports regulatory requirements and industry standards for software transparency
+      - **Integration Friendly**: Seamlessly integrates with vulnerability scanners and security tools for comprehensive analysis
+    linter_banner_image_url: https://user-images.githubusercontent.com/5199289/136844524-1527b09f-c5cb-4aa9-be54-5aa92a6086c1.png
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - file
+      # https://github.com/anchore/syft/pull/1218
+      #- list_of_files
+      - project
+    config_file_name: .syft.yaml
+    cli_config_arg_name: --config
+    cli_lint_extra_args:
+      - scan
+    cli_lint_mode_file_extra_args_after:
+      - file:{{FILE}}
+    cli_lint_mode_project_exclude_arg_name: "--exclude"
+    cli_lint_mode_project_exclude_arg_value: "**/{{DIR}}"
+    cli_lint_mode_project_exclude_config_key: "exclude"
+    cli_lint_mode_project_extra_args_after:
+      - dir:.
+    cli_sarif_args:
+      - --output
+      - json
+      - --file
+      - "{{SARIF_OUTPUT_FILE}}.syft.json"
+    test_folder: repository_syft
+    examples:
+      - "syft /tmp/lint"
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=github-tags depName=anchore/syft
+          ARG REPOSITORY_SYFT_VERSION=1.50.0
+        - RUN curl -sSfL https://raw.githubusercontent.com/anchore/syft/refs/tags/v${REPOSITORY_SYFT_VERSION}/install.sh | sh -s -- -b /usr/local/bin
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+  # TRIVY
+  - class: TrivyLinter
+    linter_name: trivy
+    can_output_sarif: true
+    descriptor_flavors:
+      - all_flavors # Applicable to CI in any language project
+      - ci_light
+      - cupcake
+      - security
+    linter_text: |
+      **Trivy** is a comprehensive security scanner that detects vulnerabilities, misconfigurations, secrets, and license issues in container images, filesystems, and git repositories. It serves as an all-in-one security solution for modern development workflows.
+
+      **Key Features:**
+
+      - **Multi-Target Scanning**: Analyzes container images, filesystem directories, git repositories, Kubernetes clusters, and cloud infrastructure
+      - **Vulnerability Detection**: Comprehensive CVE database covering OS packages, language-specific libraries, and application dependencies
+      - **Misconfiguration Scanning**: Built-in policies for Infrastructure as Code including Terraform, CloudFormation, Kubernetes, and Docker
+      - **Secret Detection**: Identifies hardcoded secrets, API keys, passwords, and sensitive information in source code
+      - **License Scanning**: Analyzes software licenses to ensure compliance with organizational policies
+      - **SARIF Output**: Modern security report format for integration with development platforms and security tools
+      - **High Performance**: Fast scanning optimized for CI/CD pipelines with efficient caching mechanisms
+      - **Offline Support**: Can operate in air-gapped environments with offline vulnerability databases
+      - **Extensive Integration**: Works with major CI/CD platforms, container registries, and security orchestration tools
+
+      **Note**: You can ignore specific findings by defining a [.trivyignore file](https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/#by-finding-ids) at your repository root.
+
+      **Tip**: if you see errors related to files that do not exist, you can bypass them using "--skip-dirs"
+
+      Example:
+
+      ```yaml
+      REPOSITORY_TRIVY_ARGUMENTS:
+      - "--skip-dirs"
+      - ".venv"
+      - "--skip-dirs"
+      - "github_conf"
+      ```
+    linter_url: https://aquasecurity.github.io/trivy/
+    linter_repo: https://github.com/aquasecurity/trivy
+    linter_speed: 2
+    linter_banner_image_url: https://github.com/aquasecurity/trivy/raw/main/docs/imgs/logo.png
+    linter_icon_png_url: https://raw.githubusercontent.com/oxsecurity/megalinter/main/docs/assets/icons/linters/trivy.png
+    linter_rules_configuration_url: https://aquasecurity.github.io/trivy/latest/docs/configuration/
+    linter_rules_ignore_config_url: https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/#by-inline-comments
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - file
+      - project
+    config_file_name: trivy.yaml
+    cli_config_arg_name: --config
+    cli_sarif_args:
+      - --format
+      - sarif
+      - -o
+      - "{{SARIF_OUTPUT_FILE}}"
+    cli_lint_extra_args:
+      - fs
+      - --scanners
+      - vuln,misconfig
+      - --exit-code
+      - "1"
+    cli_lint_mode_project_exclude_arg_name: "--skip-dirs"
+    cli_lint_mode_project_exclude_arg_value: "**/{{DIR}}"
+    cli_lint_mode_project_exclude_config_key: "scan.skip-dirs"
+    cli_lint_mode_project_extra_args_after:
+      - .
+    common_linter_errors:
+      - identifier: REPOSITORY_TRIVY_ERROR_TOOMANYREQUESTS
+        regex: "TOOMANYREQUESTS"
+        message: |-
+          trivy was rate-limited by GitHub Container Registry (ghcr.io) while downloading the vulnerability database.
+          This is a registry rate limit, not a vulnerability finding.
+          Workarounds:
+            - Retry the run later (the limit is per-namespace and resets quickly).
+            - Authenticate pulls so requests count against your own quota. MegaLinter strips token/password env vars by default, so whitelist them for this linter in your .mega-linter.yml:
+                REPOSITORY_TRIVY_UNSECURED_ENV_VARIABLES:
+                  - GITHUB_TOKEN
+                  - TRIVY_USERNAME
+                  - TRIVY_PASSWORD
+            - Mirror the trivy-db to your own registry and point trivy at it via `TRIVY_DB_REPOSITORY`.
+            - Cache `~/.cache/trivy` across CI runs.
+            - Temporarily mark the linter as non-blocking by adding to your .mega-linter.yml:
+                DISABLE_ERRORS_LINTERS:
+                  - REPOSITORY_TRIVY
+      - identifier: REPOSITORY_TRIVY_ERROR_DB_DOWNLOAD_FAILED
+        regex: "(failed to download (vulnerability )?(DB|database)|database download error|could not pull image)"
+        message: |-
+          trivy could not download or refresh its vulnerability database from the configured registry.
+          Workarounds:
+            - Retry the run; this is often transient.
+            - Set `TRIVY_DB_REPOSITORY` to an alternative mirror (e.g. an internal registry or AWS ECR Public Gallery).
+            - Pre-populate `~/.cache/trivy` in CI.
+      - identifier: REPOSITORY_TRIVY_ERROR_REGISTRY_UNAUTHORIZED
+        regex: "(UNAUTHORIZED: authentication required|unexpected status (code )?401|status 401 Unauthorized)"
+        message: |-
+          trivy received a 401 Unauthorized response from a container registry while pulling the DB or an image to scan.
+          Resolutions:
+            - Provide credentials. MegaLinter strips token/password env vars by default, so whitelist them for this linter in your .mega-linter.yml:
+                REPOSITORY_TRIVY_UNSECURED_ENV_VARIABLES:
+                  - TRIVY_USERNAME
+                  - TRIVY_PASSWORD
+                  - GITHUB_TOKEN
+            - For AWS ECR, ensure the runner has IAM permissions to pull from the registry.
+            - Verify `TRIVY_DB_REPOSITORY` points to a repository you can actually access.
+    test_folder: trivy
+    examples:
+      - "trivy fs --scanners vuln,misconfig ."
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=github-tags depName=aquasecurity/trivy
+          ARG REPOSITORY_TRIVY_VERSION=0.73.0
+        - |
+          RUN wget --tries=5 -q -O - https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin "v${REPOSITORY_TRIVY_VERSION}" \
+              && (trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress)
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+    ide:
+      vscode:
+        - name: VSCode Trivy
+          url: https://marketplace.visualstudio.com/items?itemName=AquaSecurityOfficial.trivy-vulnerability-scanner
+
+  # TRIVY SBOM
+  - class: TrivySbomLinter
+    linter_name: trivy-sbom
+    can_output_sarif: true
+    is_sbom: true
+    name: REPOSITORY_TRIVY_SBOM
+    cli_executable: trivy
+    descriptor_flavors:
+      - all_flavors # Applicable to CI in any language project
+      - ci_light
+      - cupcake
+      - security
+    linter_text: |
+      **Trivy SBOM** is a specialized component of Trivy that generates comprehensive Software Bill of Materials (SBOM) documents for enhanced supply chain security and compliance. It provides detailed inventory management for software components and dependencies.
+
+      **Key Features:**
+
+      - **Comprehensive Component Discovery**: Automatically detects and catalogs all software components, libraries, and dependencies in projects
+      - **Multi-Format SBOM Output**: Generates SBOMs in industry-standard formats including SPDX and CycloneDX for maximum compatibility
+      - **Container and Filesystem Analysis**: Creates SBOMs for container images, filesystems, and source code repositories
+      - **Dependency Mapping**: Provides complete dependency graphs showing relationships between components
+      - **License Information**: Includes license details for each component to support compliance and legal reviews
+      - **Vulnerability Context**: Links SBOM data with security information for comprehensive risk assessment
+      - **Supply Chain Transparency**: Enables organizations to meet regulatory requirements and industry standards
+      - **Audit Trail**: Creates detailed records of software composition for security auditing and compliance reporting
+    linter_url: https://aquasecurity.github.io/trivy/
+    linter_repo: https://github.com/aquasecurity/trivy
+    linter_speed: 2
+    linter_banner_image_url: https://github.com/aquasecurity/trivy/raw/main/docs/imgs/logo.png
+    linter_icon_png_url: https://raw.githubusercontent.com/oxsecurity/megalinter/main/docs/assets/icons/linters/trivy-sbom.png
+    linter_rules_configuration_url: https://aquasecurity.github.io/trivy/latest/docs/configuration/
+    linter_rules_ignore_config_url: https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/#by-inline-comments
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - file
+      - project
+    config_file_name: trivy-sbom.yaml
+    cli_config_arg_name: --config
+    cli_lint_extra_args:
+      - fs
+      - --format
+      - cyclonedx
+    cli_lint_mode_project_exclude_arg_name: "--skip-dirs"
+    cli_lint_mode_project_exclude_arg_value: "**/{{DIR}}"
+    cli_lint_mode_project_exclude_config_key: "scan.skip-dirs"
+    cli_lint_mode_project_extra_args_after:
+      - .
+    cli_sarif_args:
+      - --output
+      - "{{SARIF_OUTPUT_FILE}}.trivy-sbom.json"
+    common_linter_errors:
+      - identifier: REPOSITORY_TRIVY_SBOM_ERROR_TOOMANYREQUESTS
+        regex: "TOOMANYREQUESTS"
+        message: |-
+          trivy-sbom was rate-limited by GitHub Container Registry (ghcr.io) while downloading the trivy DB.
+          This is a registry rate limit, not an SBOM error.
+          Workarounds:
+            - Retry the run later.
+            - Authenticate pulls. MegaLinter strips token/password env vars by default, so whitelist them for this linter in your .mega-linter.yml:
+                REPOSITORY_TRIVY_SBOM_UNSECURED_ENV_VARIABLES:
+                  - GITHUB_TOKEN
+                  - TRIVY_USERNAME
+                  - TRIVY_PASSWORD
+            - Mirror trivy-db to your own registry via `TRIVY_DB_REPOSITORY`.
+            - Temporarily mark the linter as non-blocking by adding to your .mega-linter.yml:
+                DISABLE_ERRORS_LINTERS:
+                  - REPOSITORY_TRIVY_SBOM
+      - identifier: REPOSITORY_TRIVY_SBOM_ERROR_DB_DOWNLOAD_FAILED
+        regex: "(failed to download (vulnerability )?(DB|database)|database download error)"
+        message: |-
+          trivy-sbom could not download or refresh its vulnerability database.
+          Workarounds:
+            - Retry the run; this is often transient.
+            - Set `TRIVY_DB_REPOSITORY` to an alternative mirror.
+            - Pre-populate `~/.cache/trivy` in CI.
+    test_folder: trivy
+    examples:
+      - "trivy fs --format cyclonedx ."
+      - "trivy fs --config trivy-sbom.yaml --format cyclonedx ."
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=github-tags depName=aquasecurity/trivy
+          ARG REPOSITORY_TRIVY_SBOM_VERSION=0.73.0
+        - |
+          RUN wget --tries=5 -q -O - https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin "v${REPOSITORY_TRIVY_SBOM_VERSION}" \
+              && (trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress)
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+    ide:
+      vscode:
+        - name: VSCode Trivy
+          url: https://marketplace.visualstudio.com/items?itemName=AquaSecurityOfficial.trivy-vulnerability-scanner
+
+  # TRUFFLEHOG
+  - class: TruffleHogLinter
+    linter_name: trufflehog
+    linter_text: |
+      **TruffleHog** is an advanced secrets scanner that searches through git repositories, files, and other sources to find secrets, passwords, API keys, and other sensitive information that may have been accidentally committed to code. It combines pattern matching, entropy analysis, and verification capabilities to provide comprehensive secret detection.
+
+      **Key Features:**
+
+      - **Git History Scanning**: Deep analysis of entire git history including all branches, commits, and deleted files
+      - **Entropy Analysis**: Advanced mathematical analysis to detect high-entropy strings that may be secrets
+      - **Pattern Matching**: Extensive library of regex patterns for detecting known secret formats from popular services
+      - **Secret Verification**: Validates detected secrets by attempting authentication with the actual services
+      - **Multi-Source Support**: Scans git repositories, filesystems, cloud storage, databases, and container images
+      - **Custom Detectors**: Extensible framework for adding organization-specific secret detection patterns
+      - **Performance Optimized**: Efficient scanning algorithms suitable for large repositories and continuous monitoring
+      - **Detailed Reporting**: Comprehensive output with context, verification status, and remediation guidance
+      - **False Positive Management**: Sophisticated filtering and ignore systems to reduce noise and focus on real threats
+    descriptor_flavors:
+      - all_flavors # Applicable to CI in any language project
+      - ci_light
+      - cupcake
+      - security
+    linter_speed: 2
+    linter_url: https://github.com/trufflesecurity/trufflehog
+    linter_repo: https://github.com/trufflesecurity/trufflehog
+    linter_banner_image_url: https://storage.googleapis.com/trufflehog-static-sources/pixel_pig.png
+    linter_icon_png_url: https://raw.githubusercontent.com/oxsecurity/megalinter/main/docs/assets/icons/linters/trufflehog.png
+    linter_rules_configuration_url: https://github.com/trufflesecurity/trufflehog#regex-detector-alpha
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - file
+      - list_of_files
+      - project
+    cli_config_arg_name: "--config"
+    config_file_name: .trufflehog.yml
+    cli_lint_extra_args:
+      - --fail
+      - --only-verified
+      - --no-update
+      - filesystem
+    cli_lint_mode_project_extra_args_after:
+      - .
+    cli_help_arg_name: --help
+    cli_version_arg_name: --version
+    examples:
+      - "trufflehog filesystem ."
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=docker depName=trufflesecurity/trufflehog
+          ARG REPOSITORY_TRUFFLEHOG_VERSION=3.96.0
+        - FROM trufflesecurity/trufflehog:${REPOSITORY_TRUFFLEHOG_VERSION} AS trufflehog
+        - COPY --link --from=trufflehog /usr/bin/trufflehog /usr/bin/
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+    test_folder: repository_trufflehog
+  # kingfisher
+  - class: KingfisherLinter
+    linter_name: kingfisher
+    can_output_sarif: true
+    descriptor_flavors:
+      - all
+      - security
+    linter_text: |
+      **kingfisher** is a blazingly fast secret-scanning and live validation tool built in Rust. It combines Intel's SIMD-accelerated regex engine (Hyperscan) with language-aware parsing to achieve high accuracy at massive scale, and ships with hundreds of built-in rules to detect, validate, and triage secrets before they ever reach production.
+
+      **Key Features:**
+
+      - **Performance:** multithreaded, Hyperscan-powered scanning built for huge codebases
+      - **Extensible rules:** hundreds of built-in detectors plus YAML-defined custom rules (docs/RULES.md)
+      - **Blast Radius Mapping:** instantly map leaked keys to their effective cloud identities and exposed resources with --access-map
+      - **Broad AI SaaS coverage:** finds and validates tokens for OpenAI, Anthropic, Google Gemini, Cohere, AWS Bedrock, Voyage AI, Mistral, Stability AI, Replicate, xAI (Grok), Ollama, Langchain, Perplexity, Weights & Biases, Cerebras, Friendli, Fireworks.ai, NVIDIA NIM, Together.ai, Zhipu, and many more
+      - **Compressed Files:** Supports extracting and scanning compressed files for secrets
+      - **Baseline management:** generate and track baselines to suppress known secrets (docs/BASELINE.md)
+      - **Checksum-aware detection:** verifies tokens with built-in checksums (e.g., GitHub, Confluent, Zuplo) — no API calls required
+      - **Built-in Report Viewer:** Visualize and triage findings locally with kingfisher view ./report-file.json
+    linter_url: https://github.com/mongodb/kingfisher
+    linter_repo: https://github.com/mongodb/kingfisher
+    linter_spdx_license: Apache-2.0
+    linter_rules_url: https://mongodb.github.io/kingfisher/rules/builtin-rules
+    linter_rules_inline_disable_url: https://mongodb.github.io/kingfisher/usage/advanced/?h=inline#inline-ignore-directives
+    test_folder: repository_kingfisher
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - file
+      - list_of_files
+      - project
+    cli_lint_extra_args:
+      - "scan"
+      - "--redact"
+      - "--git-history=none"
+    cli_lint_mode_project_exclude_arg_name: "--exclude"
+    cli_lint_mode_project_extra_args_after:
+      - .
+    cli_sarif_args:
+      - --format
+      - sarif
+    common_linter_errors:
+      - identifier: REPOSITORY_KINGFISHER_ERROR_GITHUB_API_RATE_LIMIT
+        regex: "(API rate limit exceeded|GitHub API.*rate limit|secondary rate limit)"
+        message: |-
+          kingfisher hit the GitHub API rate limit while resolving or validating findings.
+          This is an API quota issue, not a code finding.
+          Resolutions:
+            - Provide a token via `KF_GITHUB_TOKEN` to raise the rate limit. Because MegaLinter strips token-like env vars by default, you must also whitelist it for this linter in your .mega-linter.yml:
+                REPOSITORY_KINGFISHER_UNSECURED_ENV_VARIABLES:
+                  - KF_GITHUB_TOKEN
+            - Retry the run later once the quota resets.
+            - Temporarily mark the linter as non-blocking by adding to your .mega-linter.yml:
+                DISABLE_ERRORS_LINTERS:
+                  - REPOSITORY_KINGFISHER
+      - identifier: REPOSITORY_KINGFISHER_ERROR_GITHUB_TOKEN_UNAUTHORIZED
+        regex: "(401 Unauthorized|Bad credentials)"
+        message: |-
+          kingfisher could not authenticate to the GitHub API while validating a secret or fetching repo metadata.
+          Resolutions:
+            - Verify `KF_GITHUB_TOKEN` is set, is not expired, and is whitelisted for this linter (MegaLinter strips token-like env vars by default):
+                REPOSITORY_KINGFISHER_UNSECURED_ENV_VARIABLES:
+                  - KF_GITHUB_TOKEN
+            - For org-scoped resources, ensure the token has the required scopes (e.g. `repo`, `read:org`).
+      - identifier: REPOSITORY_KINGFISHER_ERROR_RULES_LOAD_FAILED
+        regex: "(Failed to load (builtin )?rules|Failed to parse YAML from|Failed to build regex|Unknown rule:)"
+        message: |-
+          kingfisher failed to load its detection rules. This typically means a custom YAML rules file passed via `--rules-path` is malformed.
+          Resolutions:
+            - Remove the custom rules path and rely on the built-in rules.
+            - Validate your custom YAML rules against `docs/RULES.md` in the kingfisher repo.
+    examples:
+      - "kingfisher scan ."
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=github-tags depName=mongodb/kingfisher
+          ARG REPOSITORY_KINGFISHER_VERSION=1.112.0
+        - |
+          RUN curl --silent --location https://raw.githubusercontent.com/mongodb/kingfisher/main/scripts/install-kingfisher.sh | bash -s -- /usr/local/bin --tag "v${REPOSITORY_KINGFISHER_VERSION}"
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64

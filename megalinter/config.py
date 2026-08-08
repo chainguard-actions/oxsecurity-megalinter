@@ -1,0 +1,414 @@
+#!/usr/bin/env python3
+import json
+import logging
+import os
+import re
+import shlex
+import tempfile
+import time
+
+import requests
+import yaml
+
+RUN_CONFIGS = {}  # type: ignore[var-annotated]
+SKIP_DELETE_CONFIG = False
+_ENV_CACHE = None  # Cached copy of os.environ to avoid repeated copies
+DEFAULT_SECURED_ENV_VARIABLES = (
+    "PAT",
+    "SYSTEM_ACCESSTOKEN",
+    "(^|_)(USERNAME)($|_)",
+    "(^|_)(PASSWORD|PASSWD|PASS|PWD)($|_)",
+    "(^|_)(TOKEN|ID_TOKEN|ACCESS_TOKEN|REFRESH_TOKEN|BEARER)($|_)",
+    "(^|_)(SECRET|SECRETS)($|_)",
+    "(^|_)(API_KEY|APP_KEY|CLIENT_ID|CLIENT_SECRET|CLIENT_KEY|SECRET_KEY|ACCESS_KEY|ACCESS_KEY_ID|"
+    "PRIVATE_KEY|SSH_KEY|SIGNING_KEY|ENCRYPTION_KEY|LICENSE_KEY)($|_)",
+    "(^|_)(AUTH|AUTHORIZATION)($|_)",
+    "(^|_)(CERT|CERTIFICATE|CA_BUNDLE|KUBECONFIG)($|_)",
+    "(^|_)(CONNECTION_STRING|DATABASE_URL|DB_URL|DSN)($|_)",
+    "(GOOGLE_APPLICATION_CREDENTIALS)",
+    "(GCP_SERVICE_ACCOUNT.*)",
+    "(SFDX_CLIENT_ID_.*)",
+    "(SFDX_CLIENT_KEY_.*)",
+    "(^|_)(SLACK|DISCORD|TEAMS|WEBHOOK)_URL($|_)",
+)
+
+
+# Fetch a remote config file with a request timeout and bounded retries.
+# Remote configs live on raw.githubusercontent.com, whose CDN edge cache can
+# lag behind a fresh push (transient 404) and occasionally returns 5xx; a bare
+# requests.get with no timeout/retry turns any such blip into a hard failure.
+# Retries cover network exceptions and every non-200; the last response is
+# returned so callers keep their own specific status-code error messages.
+def http_get_with_retry(url, headers=None, retries=3, timeout=30, backoff_base=2):
+    last_response = None
+    last_error = None
+    for attempt in range(retries):
+        try:
+            last_response = requests.get(
+                url, allow_redirects=True, headers=headers or {}, timeout=timeout
+            )
+            if last_response.status_code == 200:
+                return last_response
+            last_error = f"HTTP {last_response.status_code}"
+        except requests.RequestException as e:
+            last_response = None
+            last_error = str(e)
+        if attempt < retries - 1:
+            delay = backoff_base**attempt
+            logging.warning(
+                f"[config] Attempt {attempt + 1}/{retries} to fetch {url} failed "
+                f"({last_error}); retrying in {delay}s"
+            )
+            time.sleep(delay)
+    if last_response is not None:
+        return last_response
+    raise RuntimeError(
+        f"Unable to retrieve {url} after {retries} attempts: {last_error}"
+    )
+
+
+def init_config(request_id, workspace=None, params=None):
+    if params is None:
+        params = {}
+    global RUN_CONFIGS
+    global _ENV_CACHE
+    _ENV_CACHE = None  # Invalidate env cache on config init
+    if request_id in RUN_CONFIGS:
+        existing_config = get_config(request_id)
+        new_config = existing_config | params
+        set_config(request_id, new_config)
+        logging.debug(
+            f"[config] Already initialized: {RUN_CONFIGS[request_id]['CONFIG_SOURCE']}"
+        )
+        return
+    env = os.environ.copy()
+    env_plus_params = env | params
+    if workspace is None and "MEGALINTER_CONFIG" not in env_plus_params:
+        set_config(request_id, env_plus_params)
+        RUN_CONFIGS[request_id][
+            "CONFIG_SOURCE"
+        ] = "Environment variables only (no workspace)"
+        print(f"[config] {RUN_CONFIGS[request_id]['CONFIG_SOURCE']}")
+        return
+    else:
+        set_config(request_id, env_plus_params)
+        RUN_CONFIGS[request_id][
+            "CONFIG_SOURCE"
+        ] = "TEMPORARY VAL THAT SHOULD NOT REMAIN"
+    # Search for config file
+    config_file = None
+    if "MEGALINTER_CONFIG" in env_plus_params:
+        config_file_name = env_plus_params.get("MEGALINTER_CONFIG")
+        if config_file_name.startswith("https://"):
+            # Remote configuration file
+            config_file = (
+                tempfile.gettempdir()
+                + os.path.sep
+                + config_file_name.rsplit("/", 1)[-1]
+            )
+            r = http_get_with_retry(config_file_name)
+            if r.status_code != 200:
+                raise RuntimeError(f"Unable to retrieve config file {config_file_name}")
+            with open(config_file, "wb") as f:
+                f.write(r.content)
+        # Hardcoded path to config file
+        elif os.path.isfile(config_file_name):
+            config_file = config_file_name
+        else:
+            # Local configuration file with name forced by user
+            config_file = workspace + os.path.sep + config_file_name
+    else:
+        # Local configuration file found with default name
+        config_file = workspace + os.path.sep + ".mega-linter.yml"
+        for candidate in [
+            ".mega-linter.yml",
+            ".megalinter.yml",
+            ".mega-linter.yaml",
+            ".megalinter.yaml",
+        ]:
+            if os.path.isfile(workspace + os.path.sep + candidate):
+                config_file = workspace + os.path.sep + candidate
+                break
+    # if config file is found, merge its values with environment variables (with priority to env values)
+    if os.path.isfile(config_file):
+        with open(config_file, "r", encoding="utf-8") as config_file_stream:
+            config_data = yaml.safe_load(config_file_stream)
+            if config_data is None:  # .mega-linter.yml existing but empty
+                runtime_config = env_plus_params
+            else:
+                # append config file variables to env variables, with priority to env variables
+                runtime_config = config_data | env_plus_params
+            RUN_CONFIGS[request_id][
+                "CONFIG_SOURCE"
+            ] = f"{config_file} + Environment variables"
+    else:
+        runtime_config = env_plus_params
+        RUN_CONFIGS[request_id][
+            "CONFIG_SOURCE"
+        ] = f"Environment variables only (no config file found in {workspace})"
+    # manage EXTENDS in configuration
+    if "EXTENDS" in runtime_config:
+        combined_config = {}
+        RUN_CONFIGS[request_id]["CONFIG_SOURCE"] = combine_config(
+            workspace,
+            runtime_config,
+            combined_config,
+            RUN_CONFIGS[request_id]["CONFIG_SOURCE"],
+        )
+        runtime_config = combined_config
+    # Print & set config in cache
+    print(f"[config] {RUN_CONFIGS[request_id]['CONFIG_SOURCE']}")
+    set_config(request_id, runtime_config)
+
+
+def combine_config(workspace, config, combined_config, config_source):
+    config_properties_to_append = []
+
+    if "CONFIG_PROPERTIES_TO_APPEND" in config:
+        config_properties_to_append = config["CONFIG_PROPERTIES_TO_APPEND"]
+
+    extends = config["EXTENDS"]
+    if isinstance(extends, str):
+        extends = extends.split(",")
+    for extends_item in extends:
+        if extends_item.startswith("http"):
+            headers = {}
+            if (
+                extends_item.startswith("https://raw.githubusercontent.com")
+                and "GITHUB_TOKEN" in os.environ
+            ):
+                github_token = os.environ["GITHUB_TOKEN"]
+                headers["Authorization"] = f"token {github_token}"
+            r = http_get_with_retry(extends_item, headers=headers)
+            assert (
+                r.status_code == 200
+            ), f"Unable to retrieve EXTENDS config file {extends_item}"
+            extends_config_data = yaml.safe_load(r.content)
+        else:
+            with open(
+                workspace + os.path.sep + extends_item, "r", encoding="utf-8"
+            ) as f:
+                extends_config_data = yaml.safe_load(f)
+        merge_dicts(combined_config, extends_config_data, config_properties_to_append)
+        config_source += f"\n[config] - extends from: {extends_item}"
+        if "EXTENDS" in extends_config_data:
+            combine_config(
+                workspace,
+                extends_config_data,
+                combined_config,
+                config_source,
+            )
+    merge_dicts(combined_config, config, config_properties_to_append)
+    return config_source
+
+
+def merge_dicts(first, second, config_properties_to_append):
+    for k, v in second.items():
+        if k not in first:
+            first[k] = v
+        else:
+            if (
+                isinstance(first[k], list)
+                and isinstance(v, list)
+                and k in config_properties_to_append
+            ):
+                first[k] = first[k] + v
+            else:
+                first[k] = v
+
+
+def is_initialized_for(request_id):
+    global RUN_CONFIGS
+    if request_id in RUN_CONFIGS:
+        return True
+    return False
+
+
+def get_config(request_id=None):
+    global RUN_CONFIGS
+    global _ENV_CACHE
+    if request_id is not None and request_id in RUN_CONFIGS:
+        # Return request config
+        return RUN_CONFIGS[request_id]
+    elif request_id is not None:
+        raise Exception(
+            f"Internal error: there should be a config for request_id {request_id}"
+        )
+    else:
+        # Return cached ENV snapshot (refreshed on init_config calls)
+        if _ENV_CACHE is None:
+            _ENV_CACHE = os.environ.copy()
+        return _ENV_CACHE
+
+
+def set_config(request_id, runtime_config):
+    global RUN_CONFIGS
+    RUN_CONFIGS[request_id] = runtime_config
+
+
+def get(request_id, config_var=None, default=None):
+    if config_var is None:
+        return get_config(request_id)
+    val = get_config(request_id).get(config_var, default)
+    # IF boolean, convert to "true" or "false"
+    if isinstance(val, bool):
+        if val is True:
+            val = "true"
+        elif val is False:
+            val = "false"
+    return val
+
+
+def get_first_var_set(request_id, config_vars=[], default=None):
+    for config_var in config_vars:
+        val = get(request_id, config_var, None)
+        if val is not None and val != "":
+            if isinstance(val, bool):
+                if val is True:
+                    val = "true"
+                elif val is False:
+                    val = "false"
+            return val
+    return default
+
+
+def set(request_id, config_var, value):
+    global RUN_CONFIGS
+    assert request_id in RUN_CONFIGS, "Config has not been initialized yet !"
+    RUN_CONFIGS[request_id][config_var] = value
+
+
+# Get list of elements from configuration. It can be list of strings or objects
+def get_list(request_id, config_var, default=None):
+    var = get(request_id, config_var, None)
+    if var is not None:
+        # List format
+        if isinstance(var, list):
+            return var
+        # Empty var: return empty list
+        if var == "":
+            return []
+        # Serialized JSON
+        if var.startswith("["):
+            return json.loads(var)
+        # String with comma-separated elements
+        return var.split(",")
+    return default
+
+
+# Retrieve a configuration variable as a list of arguments, handling various input formats.
+def get_list_args(request_id, config_var, default=None):
+    # Retrieve the variable from the configuration
+    var = get(request_id, config_var, None)
+
+    match var:
+        # None return the default value
+        case None:
+            return default
+        # Blank or whitespace-only strings return empty list
+        case "" | str() if var.strip() == "":
+            return []
+        # Integer or a Decimal return it as a list
+        case int() | float():
+            return [str(var)]
+        # If already a list just return it
+        case list():
+            return var
+        # If string does not contain spaces, return it as a list
+        case str() if " " not in var.strip():
+            return [var]
+        # Otherwise, split the string using shlex and return the result
+        case _:
+            return shlex.split(var)
+
+
+def set_value(request_id, config_var, val):
+    config = get_config(request_id)
+    config[config_var] = val
+    set_config(request_id, config)
+
+
+def exists(request_id, config_var):
+    return config_var in get_config(request_id)
+
+
+def copy(request_id):
+    return get_config(request_id).copy()
+
+
+def delete(request_id=None, key=None):
+    global RUN_CONFIGS
+    global SKIP_DELETE_CONFIG
+    global _ENV_CACHE
+    # Global delete (used for tests)
+    if request_id is None:
+        RUN_CONFIGS = {}
+        _ENV_CACHE = None
+        return
+    if key is None:
+        if SKIP_DELETE_CONFIG is not True:
+            del RUN_CONFIGS[request_id]
+            logging.debug("Cleared MegaLinter runtime config for request " + request_id)
+        return
+    config = get_config(request_id)
+    if key in config:
+        del config[key]
+    set_config(request_id, config)
+
+
+def build_env(request_id, secured=True, allow_list=[]):
+    secured_env_variables = []
+    secured_env_variables_regex = []
+    if secured is True:
+        secured_env_variables = list_secured_variables(request_id)
+        secured_env_variables_regex = list_secured_variables_regexes(
+            secured_env_variables
+        )
+    # Build a frozenset of plain variable names (non-regex) for O(1) lookup
+    secured_plain_vars = frozenset(
+        v for v in secured_env_variables if not v.startswith("(")
+    )
+    allow_set = frozenset(allow_list)
+    env_dict = {}
+    for key, value in get_config(request_id).items():
+        if key not in allow_set and (
+            key in secured_plain_vars
+            or match_variable_regexes(key, secured_env_variables_regex)
+        ):
+            env_dict[key] = "HIDDEN_BY_MEGALINTER"
+        elif not isinstance(value, str):
+            env_dict[key] = str(value)
+        else:
+            env_dict[key] = value
+    return env_dict
+
+
+def list_secured_variables(request_id) -> list[str]:
+    secured_env_variables_default = get_list(
+        request_id,
+        "SECURED_ENV_VARIABLES_DEFAULT",
+        list(DEFAULT_SECURED_ENV_VARIABLES),
+    )
+    secured_env_variables = get_list(
+        request_id,
+        "SECURED_ENV_VARIABLES",
+        [],
+    )
+    return secured_env_variables_default + secured_env_variables
+
+
+def list_secured_variables_regexes(secured_env_variables: list[str]):
+    regexes = []
+    for variable_expression in secured_env_variables:
+        if variable_expression.startswith("("):
+            regexes += [re.compile(variable_expression)]
+    return regexes
+
+
+def match_variable_regexes(
+    variable_name, secured_env_variable_regexes: list[re.Pattern]
+):
+    for regex in secured_env_variable_regexes:
+        if regex.search(variable_name):
+            return True
+    return False

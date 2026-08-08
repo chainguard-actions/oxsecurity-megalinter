@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+"""
+Use TfLint to lint terraform files
+https://github.com/terraform-linters/tflint
+"""
+
+import logging
+
+import megalinter
+from megalinter import config
+
+
+class TfLintLinter(megalinter.Linter):
+    # To execute before linting files
+    def before_lint_files(self):
+        # Build pre-command
+        tflint_init_command = "tflint --init"
+        if self.config_file is not None:
+            tflint_init_command += f" --config {self.config_file}"
+        logging.debug("tflint before_lint_files: " + tflint_init_command)
+        # Add to pre-commands
+        tflint_secured_env = (
+            False
+            if config.get(self.request_id, "TERRAFORM_TFLINT_SECURED_ENV", "true")
+            == "false"
+            else True
+        )
+        replacement_def = dict(
+            {"var_dest": "GITHUB_TOKEN", "var_src": "PAT_GITHUB_COM"}
+        )
+        tflint_pre_command = {
+            "command": tflint_init_command,
+            "cwd": self.workspace,
+            "secured_env": tflint_secured_env,
+            "replacement_env_vars": [replacement_def],
+        }
+        if self.pre_commands is None:
+            self.pre_commands = []
+        self.pre_commands.append(tflint_pre_command)
+
+    def build_lint_command(self, file=None) -> list:
+        cmd = super().build_lint_command(file)
+
+        if self.cli_lint_mode == "file":
+            cmd.remove(file)
+            cmd += [f"--filter={file}"]
+        elif self.cli_lint_mode == "list_of_files":
+            for file_to_lint in self.files:
+                cmd.remove(file_to_lint)
+                cmd += [f"--filter={file_to_lint}"]
+
+        return cmd
+
+    def pre_test(self, test_name):
+        config.set_value(
+            self.request_id, "TERRAFORM_TFLINT_UNSECURED_ENV_VARIABLES", "GITHUB_TOKEN"
+        )
