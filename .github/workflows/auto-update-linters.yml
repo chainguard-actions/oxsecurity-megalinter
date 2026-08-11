@@ -1,0 +1,144 @@
+---
+name: "Auto-Update Linters"
+on:
+  # Run when there is an update in main
+  push:
+    branches:
+      - main
+      - auto-update
+      - fixes/docgen
+  # Automatically run every day at 21:49 UTC, before a start of hour peak
+  schedule:
+    - cron: "49 21 * * *"
+  # Allow to manually trigger a run of the workflow
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+###############
+# Set the Job #
+###############
+jobs:
+
+  build_help_versions:
+    # Name the Job
+    name: Auto-Update Linters
+    # Set the agent to run on
+    runs-on: ubuntu-latest
+    permissions:
+      # Give the default GITHUB_TOKEN write permission to commit and push, comment issues & post new PR
+      # Remove the ones you do not need
+      contents: write
+      issues: write
+      pull-requests: write
+    environment:
+      name: auto-update
+    # Prevent duplicate run from happening when a forked push is committed
+    if: (github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository) && github.repository == 'oxsecurity/megalinter'
+    # Set max build time for the job
+    timeout-minutes: 60
+    ##################
+    # Load all steps #
+    ##################
+    steps:
+      ##########################
+      # Checkout the code base #
+      ##########################
+      - name: Checkout Code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # Free disk space
+      - name: Free Disk space
+        shell: bash
+        run: |
+          sudo rm -rf /usr/local/lib/android  # will release about 10 GB if you don't need Android
+          sudo rm -rf /usr/share/dotnet # will release about 20GB if you don't need .NET
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      #######################
+      # Docker Buildx setup #
+      #######################
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      ########################
+      # Get the current date #
+      ########################
+      - name: Get current date
+        run: echo "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> ${GITHUB_ENV}
+
+      ###################################
+      # Build image locally for testing #
+      ###################################
+      - name: Build MegaLinter Docker Image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          build-args: |
+            BUILD_DATE=${{ env.BUILD_DATE }}
+            BUILD_REVISION=auto_update_${{ github.sha }}
+            BUILD_VERSION=auto_update_${{ github.sha }}
+          load: true
+          push: false
+          secrets: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          tags: |
+            oxsecurity/megalinter:auto_update_${{ github.sha }}
+        timeout-minutes: 60
+
+      #####################################
+      # Collect linters versions & help    #
+      #####################################
+      - name: Collect latest versions and help
+        id: compute_versions
+        shell: bash
+        env:
+          GH_SHA: ${{ github.sha }}
+        run: docker run -e UPGRADE_LINTERS_VERSION=true -e GITHUB_SHA="${GH_SHA}" -e GITHUB_TOKEN=${GITHUB_TOKEN} -e GITHUB_OUTPUT="${GITHUB_OUTPUT}" -e MEGALINTER_VOLUME_ROOT="${GITHUB_WORKSPACE}" -v "/var/run/docker.sock:/var/run/docker.sock:rw" -v "/home/runner/work/_temp/_runner_file_commands":"/github/file_commands" -v ${GITHUB_WORKSPACE}:/tmp/lint "oxsecurity/megalinter:auto_update_${GH_SHA}"
+        timeout-minutes: 60
+
+      # Format markdown tables
+      - name: Format Markdown tables
+        id: format-md-tables
+        run: npx --yes markdown-table-formatter@latest --verbose "./**/*.md" || true
+
+      # Upload MegaLinter artifacts
+      - name: Archive production artifacts
+        if: success() || failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: MegaLinter reports
+          include-hidden-files: "true"
+          path: |
+            docs
+            megalinter-reports
+
+      # Create pull request if there are updates or if the workflow has been launched manually
+      - name: Create Pull Request
+        id: cpr
+        if: (github.event_name == 'workflow_dispatch' || steps.compute_versions.outputs.has_updated_versions == 1)
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
+        with:
+          token: ${{ secrets.PAT || secrets.GITHUB_TOKEN  }}
+          author: "Nicolas Vuillamy <nicolas.vuillamy@gmail.com>"
+          commit-message: "[automation] Auto-update linters version, help and documentation"
+          delete-branch: true
+          title: "[automation] Auto-update linters version, help and documentation"
+          body: "[automation] Auto-update linters version, help and documentation"
+          labels: dependencies,automerge
+      - name: Display Pull Request Info
+        if: (github.event_name == 'workflow_dispatch' || steps.compute_versions.outputs.has_updated_versions == 1)
+        env:
+          PR_NUMBER: ${{ steps.cpr.outputs.pull-request-number }}
+          PR_URL: ${{ steps.cpr.outputs.pull-request-url }}
+        run: |
+          echo "Pull Request Number - $PR_NUMBER"
+          echo "Pull Request URL - $PR_URL"

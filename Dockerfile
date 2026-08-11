@@ -1,5 +1,4 @@
 # syntax=docker/dockerfile:1
-# MEGALINTER FLAVOR [javascript]: Optimized for JAVASCRIPT or TYPESCRIPT based projects
 ###########################################
 ###########################################
 ## Dockerfile to run MegaLinter ##
@@ -22,18 +21,30 @@ ARG BASH_SHFMT_VERSION=v3.11.0-alpine
 ARG DOCKERFILE_HADOLINT_VERSION=v2.12.0-alpine
 # renovate: datasource=docker depName=mstruebing/editorconfig-checker
 ARG EDITORCONFIG_EDITORCONFIG_CHECKER_VERSION=v3.3.0
+# renovate: datasource=github-tags depName=mgechev/revive
+ARG GO_REVIVE_VERSION=v1.10.0
 # renovate: datasource=docker depName=ghcr.io/yannh/kubeconform
 ARG KUBERNETES_KUBECONFORM_VERSION=v0.7.0-alpine
 # renovate: datasource=docker depName=yoheimuta/protolint
 ARG PROTOBUF_PROTOLINT_VERSION=0.55.6
+# renovate: datasource=github-tags depName=checkmarx/dustilock
+ARG REPOSITORY_DUSTILOCK_VERSION=1.2.0
 # renovate: datasource=docker depName=zricethezav/gitleaks
 ARG REPOSITORY_GITLEAKS_VERSION=v8.27.2
+# renovate: datasource=docker depName=checkmarx/kics
+ARG REPOSITORY_KICS_VERSION=v2.1.10-alpine
 # renovate: datasource=docker depName=trufflesecurity/trufflehog
 ARG REPOSITORY_TRUFFLEHOG_VERSION=3.89.1
 # renovate: datasource=docker depName=jdkato/vale
 ARG SPELL_VALE_VERSION=v3.11.2
 # renovate: datasource=docker depName=lycheeverse/lychee
 ARG SPELL_LYCHEE_VERSION=sha-7c4b132-alpine
+# renovate: datasource=docker depName=ghcr.io/terraform-linters/tflint
+ARG TERRAFORM_TFLINT_VERSION=0.58.0
+# renovate: datasource=docker depName=tenable/terrascan
+ARG TERRAFORM_TERRASCAN_VERSION=1.19.9
+# renovate: datasource=docker depName=alpine/terragrunt
+ARG TERRAFORM_TERRAGRUNT_VERSION=1.12.2
 #ARGTOP__END
 
 #############################################################################################
@@ -48,12 +59,28 @@ FROM koalaman/shellcheck:${BASH_SHELLCHECK_VERSION} AS shellcheck
 FROM mvdan/shfmt:${BASH_SHFMT_VERSION} AS shfmt
 FROM hadolint/hadolint:${DOCKERFILE_HADOLINT_VERSION} AS hadolint
 FROM mstruebing/editorconfig-checker:${EDITORCONFIG_EDITORCONFIG_CHECKER_VERSION} AS editorconfig-checker
+FROM golang:1-alpine AS revive
+## The golang image used as a builder is a temporary workaround (https://github.com/mgechev/revive/issues/787)
+## for the released revive binaries not returning version numbers (devel).
+## The install command should then be what is commented in the go.megalinter-descriptor.yml
+ARG GO_REVIVE_VERSION
+RUN GOBIN=/usr/bin go install github.com/mgechev/revive@$GO_REVIVE_VERSION
 FROM ghcr.io/yannh/kubeconform:${KUBERNETES_KUBECONFORM_VERSION} AS kubeconform
+FROM ghcr.io/assignuser/chktex-alpine:latest AS chktex
 FROM yoheimuta/protolint:${PROTOBUF_PROTOLINT_VERSION} AS protolint
+FROM golang:alpine AS dustilock
+ARG REPOSITORY_DUSTILOCK_VERSION
+RUN apk add --no-cache git && GOBIN=/usr/bin go install github.com/checkmarx/dustilock@v${REPOSITORY_DUSTILOCK_VERSION}
 FROM zricethezav/gitleaks:${REPOSITORY_GITLEAKS_VERSION} AS gitleaks
+FROM checkmarx/kics:${REPOSITORY_KICS_VERSION} AS kics
 FROM trufflesecurity/trufflehog:${REPOSITORY_TRUFFLEHOG_VERSION} AS trufflehog
 FROM jdkato/vale:${SPELL_VALE_VERSION} AS vale
 FROM lycheeverse/lychee:${SPELL_LYCHEE_VERSION} AS lychee
+FROM ghcr.io/terraform-linters/tflint:v${TERRAFORM_TFLINT_VERSION} AS tflint
+FROM tenable/terrascan:${TERRAFORM_TERRASCAN_VERSION} AS terrascan
+FROM alpine/terragrunt:${TERRAFORM_TERRAGRUNT_VERSION} AS terragrunt
+# Next FROM line commented because already managed by another linter
+# FROM alpine/terragrunt:${TERRAFORM_TERRAGRUNT_VERSION} AS terragrunt
 #FROM__END
 
 ##################
@@ -85,18 +112,52 @@ FROM python:3.13-alpine3.21
 #ARG__START
 # renovate: datasource=crate depName=sarif-fmt
 ARG CARGO_SARIF_FMT_VERSION=0.8.0
+# renovate: datasource=github-tags depName=PowerShell/PowerShell
+ARG POWERSHELL_VERSION=7.5.1
+# renovate: datasource=github-tags depName=sgerrand/alpine-pkg-glibc
+ARG ALPINE_GLIBC_PACKAGE_VERSION=2.34-r0
+# renovate: datasource=github-tags depName=PowerShell/PowerShell
+ARG POWERSHELL_VERSION=7.5.1
+
+# renovate: datasource=npm depName=@salesforce/cli
+ARG NPM_SALESFORCE_CLI_VERSION=2.92.7
+# renovate: datasource=npm depName=@salesforce/plugin-packaging
+ARG NPM_SALESFORCE_PLUGIN_PACKAGING_VERSION=2.16.0
+# renovate: datasource=npm depName=sfdx-hardis
+ARG SFDX_HARDIS_VERSION=5.40.0
 # renovate: datasource=npm depName=typescript
 ARG NPM_TYPESCRIPT_VERSION=5.8.3
 # renovate: datasource=pypi depName=ansible-lint
 ARG PIP_ANSIBLE_LINT_VERSION=25.5.0
 # renovate: datasource=npm depName=@stoplight/spectral-cli
 ARG NPM_SPECTRAL_CLI_VERSION=6.15.0
+# renovate: datasource=github-tags depName=Azure/arm-ttk
+ARG ARM_TTK_VERSION=20250401
+ARG ARM_TTK_NAME='arm-ttk.zip'
+ARG ARM_TTK_DIRECTORY='/opt/microsoft'
 # renovate: datasource=crate depName=shellcheck-sarif
 ARG CARGO_SHELLCHECK_SARIF_VERSION=0.8.0
+# renovate: datasource=github-tags depName=Azure/bicep
+ARG BICEP_VERSION=0.36.1
+ARG BICEP_EXE='bicep'
+ARG BICEP_DIR='/usr/local/bin'
+# renovate: datasource=pypi depName=cpplint
+ARG PIP_CPPLINT_VERSION=2.0.2
+# renovate: datasource=github-tags depName=clj-kondo/clj-kondo
+ARG CLJ_KONDO_VERSION=2025.01.16
+
+# renovate: datasource=github-tags depName=greglook/cljstyle
+ARG CLJ_STYLE_VERSION=0.17.642
+# renovate: datasource=pypi depName=cfn-lint
+ARG PIP_CFN_LINT_VERSION=1.36.0
 # renovate: datasource=npm depName=@coffeelint/cli
 ARG NPM_COFFEELINT_CLI_VERSION=5.2.11
 # renovate: datasource=npm depName=jscpd
 ARG NPM_JSCPD_VERSION=4.0.5
+# renovate: datasource=nuget depName=csharpier
+ARG CSHARP_CSHARPIER_VERSION=1.0.2
+# renovate: datasource=nuget depName=roslynator.dotnet.cli
+ARG CSHARP_ROSLYNATOR_VERSION=0.10.1
 # renovate: datasource=npm depName=stylelint
 ARG NPM_STYLELINT_VERSION=16.20.0
 # renovate: datasource=npm depName=stylelint-config-standard
@@ -105,8 +166,12 @@ ARG NPM_STYLELINT_CONFIG_STANDARD_VERSION=38.0.0
 ARG NPM_STYLELINT_CONFIG_SASS_GUIDELINES_VERSION=12.1.0
 # renovate: datasource=npm depName=stylelint-scss
 ARG NPM_STYLELINT_SCSS_VERSION=6.12.1
-# renovate: datasource=pypi depName=cpplint
-ARG PIP_CPPLINT_VERSION=2.0.2
+# renovate: datasource=dart-version depName=dart
+ARG DART_VERSION='3.8.1'
+# renovate: datasource=npm depName=gherkin-lint
+ARG NPM_GHERKIN_LINT_VERSION=4.2.4
+# renovate: datasource=github-tags depName=golangci/golangci-lint
+ARG GO_GOLANGCI_LINT_VERSION=2.1.6
 # renovate: datasource=npm depName=graphql
 ARG NPM_GRAPHQL_VERSION=16.11.0
 # renovate: datasource=npm depName=graphql-schema-linter
@@ -117,6 +182,9 @@ ARG NPM_GROOVY_LINT_VERSION=15.2.0
 ARG PIP_DJLINT_VERSION=1.36.4
 # renovate: datasource=npm depName=htmlhint
 ARG NPM_HTMLHINT_VERSION=1.5.1
+# renovate: datasource=github-tags depName=pmd/pmd extractVersion=^pmd_releases/(?<version>.*)$
+ARG PMD_VERSION=7.14.0
+
 # renovate: datasource=npm depName=eslint
 ARG NPM_ESLINT_VERSION=8.57.1
 # renovate: datasource=npm depName=eslint-config-airbnb
@@ -167,14 +235,69 @@ ARG DETEKT_VERSION=1.23.8
 
 # renovate: datasource=github-tags depName=kubescape/kubescape
 ARG KUBERNETES_KUBESCAPE_VERSION=3.0.34
+# renovate: datasource=github-tags depName=cvega/luarocks
+ARG LUA_LUACHECK_VERSION=3.3.1
+
+# renovate: datasource=crate depName=selene
+ARG CARGO_SELENE_VERSION=0.28.0
+# renovate: datasource=crate depName=stylua
+ARG CARGO_STYLUA_VERSION=2.0.0
 # renovate: datasource=npm depName=markdownlint-cli
 ARG NPM_MARKDOWNLINT_CLI_VERSION=0.45.0
 # renovate: datasource=npm depName=markdown-link-check
 ARG NPM_MARKDOWN_LINK_CHECK_VERSION=3.12.2
 # renovate: datasource=npm depName=markdown-table-formatter
 ARG NPM_MARKDOWN_TABLE_FORMATTER_VERSION=1.6.1
+# renovate: datasource=github-tags depName=skaji/cpm
+ARG PERL_PERLCRITIC_VERSION=0.997023
+
+# renovate: datasource=packagist depName=squizlabs/php_codesniffer
+ARG PHP_SQUIZLABS_PHP_CODESNIFFER_VERSION=3.13.1
+# renovate: datasource=packagist depName=bartlett/sarif-php-converters
+ARG PHP_BARTLETT_SARIF_PHP_CONVERTERS_VERSION=1.1.2
+# renovate: datasource=packagist depName=phpstan/phpstan
+ARG PHP_PHPSTAN_PHPSTAN_VERSION=2.1.17
+# renovate: datasource=packagist depName=phpstan/extension-installer
+ARG PHP_PHPSTAN_EXTENSION_INSTALLER_VERSION=1.4.3
+# renovate: datasource=packagist depName=vimeo/psalm
+ARG PHP_VIMEO_PSALM_VERSION=6.12.0
+# renovate: datasource=packagist depName=overtrue/phplint
+ARG PHP_OVERTRUE_PHPLINT_VERSION=9.6.2
+# renovate: datasource=packagist depName=friendsofphp/php-cs-fixer
+ARG PHP_FRIENDSOFPHP_PHP_CS_FIXER_VERSION=v3.75.0
+# renovate: datasource=nuget depName=PSScriptAnalyzer registryUrl=https://www.powershellgallery.com/api/v2/
+ARG PSSA_VERSION='1.24.0'
+
+# renovate: datasource=rubygems depName=puppet-lint
+ARG GEM_PUPPET_LINT_VERSION=4.3.0
+# renovate: datasource=pypi depName=pylint
+ARG PIP_PYLINT_VERSION=3.3.7
+# renovate: datasource=pypi depName=typing-extensions
+ARG PIP_TYPING_EXTENSIONS_VERSION=4.14.0
+# renovate: datasource=pypi depName=black
+ARG PIP_BLACK_VERSION=25.1.0
+# renovate: datasource=pypi depName=flake8
+ARG PIP_FLAKE8_VERSION=7.2.0
+# renovate: datasource=pypi depName=isort
+ARG PIP_ISORT_VERSION=6.0.1
+# renovate: datasource=pypi depName=bandit
+ARG PIP_BANDIT_VERSION=1.8.3
+# renovate: datasource=pypi depName=bandit_sarif_formatter
+ARG PIP_BANDIT_SARIF_FORMATTER_VERSION=1.1.1
+# renovate: datasource=pypi depName=mypy
+ARG PIP_MYPY_VERSION=1.16.0
+# renovate: datasource=npm depName=pyright
+ARG NPM_PYRIGHT_VERSION=1.1.402
+# renovate: datasource=pypi depName=ruff
+ARG PIP_RUFF_VERSION=0.11.13
+# renovate: datasource=github-tags depName=nxadm/rakudo-pkg
+ARG RAKU_RAKU_VERSION=2024.12
+ARG RAKU_RAKU_ALPINE_VERSION=3.20
+
 # renovate: datasource=pypi depName=checkov
 ARG PIP_CHECKOV_VERSION=3.2.413
+# renovate: datasource=nuget depName=Microsoft.CST.DevSkim.CLI
+ARG REPOSITORY_DEVSKIM_VERSION=1.0.59
 # renovate: datasource=github-tags depName=anchore/grype
 ARG REPOSITORY_GRYPE_VERSION=0.94.0
 # renovate: datasource=npm depName=@ls-lint/ls-lint
@@ -193,6 +316,32 @@ ARG REPOSITORY_SYFT_VERSION=1.27.1
 ARG REPOSITORY_TRIVY_VERSION=0.63.0
 # renovate: datasource=github-tags depName=aquasecurity/trivy
 ARG REPOSITORY_TRIVY_SBOM_VERSION=0.63.0
+# renovate: datasource=pypi depName=Pygments
+ARG PIP_PYGMENTS_VERSION=2.19.1
+# renovate: datasource=pypi depName=restructuredtext_lint
+ARG PIP_RESTRUCTUREDTEXT_LINT_VERSION=1.4.0
+# renovate: datasource=pypi depName=rstcheck
+ARG PIP_RSTCHECK_VERSION=6.2.5
+# renovate: datasource=pypi depName=click
+ARG PIP_RSTCHECK_CLICK_VERSION=8.2.1
+# renovate: datasource=pypi depName=rstfmt
+ARG PIP_RSTFMT_VERSION=0.0.14
+# renovate: datasource=rubygems depName=rubocop
+ARG GEM_RUBOCOP_VERSION=1.76.1
+# renovate: datasource=rubygems depName=rubocop-github
+ARG GEM_RUBOCOP_GITHUB_VERSION=0.26.0
+# renovate: datasource=rubygems depName=rubocop-performance
+ARG GEM_RUBOCOP_PERFORMANCE_VERSION=1.25.0
+# renovate: datasource=rubygems depName=rubocop-rails
+ARG GEM_RUBOCOP_RAILS_VERSION=2.32.0
+# renovate: datasource=rubygems depName=rubocop-rake
+ARG GEM_RUBOCOP_RAKE_VERSION=0.7.1
+# renovate: datasource=rubygems depName=rubocop-rspec
+ARG GEM_RUBOCOP_RSPEC_VERSION=3.6.0
+# renovate: datasource=npm depName=@salesforce/sfdx-scanner
+ARG SALESFORCE_SFDX_SCANNER_VERSION=4.12.0
+# renovate: datasource=npm depName=lightning-flow-scanner
+ARG LIGHTNING_FLOW_SCANNER_VERSION=3.23.0
 # renovate: datasource=pypi depName=snakemake
 ARG PIP_SNAKEMAKE_VERSION=9.5.1
 # renovate: datasource=pypi depName=snakefmt
@@ -203,6 +352,8 @@ ARG NPM_CSPELL_VERSION=9.1.1
 ARG PIP_PROSELINT_VERSION=0.14.0
 # renovate: datasource=pypi depName=sqlfluff
 ARG PIP_SQLFLUFF_VERSION=3.4.1
+# renovate: datasource=nuget depName=TSQLLint
+ARG SQL_TSQLLINT_VERSION=1.16.0
 # renovate: datasource=npm depName=@ibm/tekton-lint
 ARG NPM_IBM_TEKTON_LINT_VERSION=1.1.0
 # renovate: datasource=npm depName=prettyjson
@@ -227,12 +378,18 @@ ARG BASH_SHELLCHECK_VERSION
 ARG BASH_SHFMT_VERSION
 ARG DOCKERFILE_HADOLINT_VERSION
 ARG EDITORCONFIG_EDITORCONFIG_CHECKER_VERSION
+ARG GO_REVIVE_VERSION
 ARG KUBERNETES_KUBECONFORM_VERSION
 ARG PROTOBUF_PROTOLINT_VERSION
+ARG REPOSITORY_DUSTILOCK_VERSION
 ARG REPOSITORY_GITLEAKS_VERSION
+ARG REPOSITORY_KICS_VERSION
 ARG REPOSITORY_TRUFFLEHOG_VERSION
 ARG SPELL_VALE_VERSION
 ARG SPELL_LYCHEE_VERSION
+ARG TERRAFORM_TFLINT_VERSION
+ARG TERRAFORM_TERRASCAN_VERSION
+ARG TERRAFORM_TERRAGRUNT_VERSION
 #ARG__END
 
 ####################
@@ -257,18 +414,53 @@ RUN apk -U --no-cache upgrade \
                 make \
                 musl-dev \
                 openssh \
+                docker \
+                openrc \
+                icu-libs \
+                go \
                 openjdk21 \
+                readline-dev \
+                perl \
+                perl-dev \
+                gnupg \
+                php84 \
+                php84-phar \
+                php84-mbstring \
+                php84-xmlwriter \
+                php84-tokenizer \
+                php84-ctype \
+                php84-curl \
+                php84-dom \
+                php84-opcache \
+                php84-openssl \
+                php84-common \
+                php84-simplexml \
+                dpkg \
+                coreutils \
                 py3-pyflakes \
+                cppcheck \
+                clang19-extra-tools \
                 openjdk17 \
                 helm \
                 gcompat \
                 libstdc++ \
+                openssl \
+                g++ \
+                libcurl \
+                libgcc \
                 libxml2-dev \
                 libxml2-utils \
-                libgcc \
+                linux-headers \
+                R \
+                R-dev \
+                R-doc \
                 npm \
                 nodejs-current \
                 yarn \
+                ruby \
+                ruby-dev \
+                ruby-bundler \
+                ruby-rdoc \
     && git config --global core.autocrlf true
 #APK__END
 
@@ -292,8 +484,8 @@ RUN mkdir -p ${GOPATH}/src ${GOPATH}/bin || true && \
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain ${RUST_RUST_VERSION} \
     && export PATH="/root/.cargo/bin:/root/.cargo/env:${PATH}" \
     && rustup default stable \
-    && cargo install --force --locked sarif-fmt@${CARGO_SARIF_FMT_VERSION} shellcheck-sarif@${CARGO_SHELLCHECK_SARIF_VERSION} \
-    && rm -rf /root/.cargo/registry /root/.cargo/git /root/.cache/sccache /root/.rustup
+    && rustup component add clippy && cargo install --force --locked sarif-fmt@${CARGO_SARIF_FMT_VERSION} shellcheck-sarif@${CARGO_SHELLCHECK_SARIF_VERSION} selene@${CARGO_SELENE_VERSION} stylua@${CARGO_STYLUA_VERSION} \
+    && rm -rf /root/.cargo/registry /root/.cargo/git /root/.cache/sccache
 ENV PATH="/root/.cargo/bin:/root/.cargo/env:${PATH}"
 #CARGO__END
 
@@ -306,10 +498,23 @@ ENV PATH="/root/.cargo/bin:/root/.cargo/env:${PATH}"
 #PIPVENV__START
 RUN PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir pip==${PIP_PIP_VERSION} virtualenv==${PIP_VIRTUALENV_VERSION} \
     && mkdir -p "/venvs/ansible-lint" && cd "/venvs/ansible-lint" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir ansible-lint==${PIP_ANSIBLE_LINT_VERSION} && deactivate && cd ./../.. \
+    && mkdir -p "/venvs/cpplint" && cd "/venvs/cpplint" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir cpplint==${PIP_CPPLINT_VERSION} && deactivate && cd ./../.. \
+    && mkdir -p "/venvs/cfn-lint" && cd "/venvs/cfn-lint" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir cfn-lint[sarif]==${PIP_CFN_LINT_VERSION} && deactivate && cd ./../.. \
     && mkdir -p "/venvs/stylelint" && cd "/venvs/stylelint" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir cpplint==${PIP_CPPLINT_VERSION} && deactivate && cd ./../.. \
     && mkdir -p "/venvs/djlint" && cd "/venvs/djlint" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir djlint==${PIP_DJLINT_VERSION} && deactivate && cd ./../.. \
+    && mkdir -p "/venvs/pylint" && cd "/venvs/pylint" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir pylint==${PIP_PYLINT_VERSION} typing-extensions==${PIP_TYPING_EXTENSIONS_VERSION} && deactivate && cd ./../.. \
+    && mkdir -p "/venvs/black" && cd "/venvs/black" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir black==${PIP_BLACK_VERSION} && deactivate && cd ./../.. \
+    && mkdir -p "/venvs/flake8" && cd "/venvs/flake8" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir flake8==${PIP_FLAKE8_VERSION} && deactivate && cd ./../.. \
+    && mkdir -p "/venvs/isort" && cd "/venvs/isort" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir black==${PIP_BLACK_VERSION} isort==${PIP_ISORT_VERSION} && deactivate && cd ./../.. \
+    && mkdir -p "/venvs/bandit" && cd "/venvs/bandit" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir bandit==${PIP_BANDIT_VERSION} bandit_sarif_formatter==${PIP_BANDIT_SARIF_FORMATTER_VERSION} bandit[toml]==${PIP_BANDIT_VERSION} && deactivate && cd ./../.. \
+    && mkdir -p "/venvs/mypy" && cd "/venvs/mypy" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir mypy==${PIP_MYPY_VERSION} && deactivate && cd ./../.. \
+    && mkdir -p "/venvs/ruff" && cd "/venvs/ruff" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir ruff==${PIP_RUFF_VERSION} && deactivate && cd ./../.. \
+    && mkdir -p "/venvs/ruff-format" && cd "/venvs/ruff-format" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir ruff==${PIP_RUFF_VERSION} && deactivate && cd ./../.. \
     && mkdir -p "/venvs/checkov" && cd "/venvs/checkov" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir checkov==${PIP_CHECKOV_VERSION} && deactivate && cd ./../.. \
     && mkdir -p "/venvs/semgrep" && cd "/venvs/semgrep" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir semgrep==${PIP_SEMGREP_VERSION} && deactivate && cd ./../.. \
+    && mkdir -p "/venvs/rst-lint" && cd "/venvs/rst-lint" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir Pygments==${PIP_PYGMENTS_VERSION} restructuredtext_lint==${PIP_RESTRUCTUREDTEXT_LINT_VERSION} && deactivate && cd ./../.. \
+    && mkdir -p "/venvs/rstcheck" && cd "/venvs/rstcheck" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir click==${PIP_RSTCHECK_CLICK_VERSION} rstcheck[toml,sphinx]==${PIP_RSTCHECK_VERSION} && deactivate && cd ./../.. \
+    && mkdir -p "/venvs/rstfmt" && cd "/venvs/rstfmt" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir rstfmt==${PIP_RSTFMT_VERSION} && deactivate && cd ./../.. \
     && mkdir -p "/venvs/snakemake" && cd "/venvs/snakemake" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir snakemake==${PIP_SNAKEMAKE_VERSION} && deactivate && cd ./../.. \
     && mkdir -p "/venvs/snakefmt" && cd "/venvs/snakefmt" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir snakefmt==${PIP_SNAKEFMT_VERSION} && deactivate && cd ./../.. \
     && mkdir -p "/venvs/proselint" && cd "/venvs/proselint" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir proselint==${PIP_PROSELINT_VERSION} && deactivate && cd ./../.. \
@@ -317,7 +522,7 @@ RUN PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir pip==${PIP_PIP_VERSION
     && mkdir -p "/venvs/yamllint" && cd "/venvs/yamllint" && virtualenv . && source bin/activate && PYTHONDONTWRITEBYTECODE=1 pip3 install --no-cache-dir yamllint==${PIP_YAMLLINT_VERSION} && deactivate && cd ./../..  \
     && find /venvs \( -type f \( -iname \*.pyc -o -iname \*.pyo \) -o -type d -iname __pycache__ \) -delete \
     && rm -rf /root/.cache
-ENV PATH="${PATH}":/venvs/ansible-lint/bin:/venvs/stylelint/bin:/venvs/djlint/bin:/venvs/checkov/bin:/venvs/semgrep/bin:/venvs/snakemake/bin:/venvs/snakefmt/bin:/venvs/proselint/bin:/venvs/sqlfluff/bin:/venvs/yamllint/bin
+ENV PATH="${PATH}":/venvs/ansible-lint/bin:/venvs/cpplint/bin:/venvs/cfn-lint/bin:/venvs/stylelint/bin:/venvs/djlint/bin:/venvs/pylint/bin:/venvs/black/bin:/venvs/flake8/bin:/venvs/isort/bin:/venvs/bandit/bin:/venvs/mypy/bin:/venvs/ruff/bin:/venvs/ruff-format/bin:/venvs/checkov/bin:/venvs/semgrep/bin:/venvs/rst-lint/bin:/venvs/rstcheck/bin:/venvs/rstfmt/bin:/venvs/snakemake/bin:/venvs/snakefmt/bin:/venvs/proselint/bin:/venvs/sqlfluff/bin:/venvs/yamllint/bin
 #PIPVENV__END
 
 ############################
@@ -331,6 +536,7 @@ ENV NODE_OPTIONS="--max-old-space-size=8192" \
 #NPM__START
 WORKDIR /node-deps
 RUN npm --no-cache install --ignore-scripts --omit=dev \
+                @salesforce/cli@${NPM_SALESFORCE_CLI_VERSION} \
                 typescript@${NPM_TYPESCRIPT_VERSION} \
                 @stoplight/spectral-cli@${NPM_SPECTRAL_CLI_VERSION} \
                 @coffeelint/cli@${NPM_COFFEELINT_CLI_VERSION} \
@@ -339,6 +545,7 @@ RUN npm --no-cache install --ignore-scripts --omit=dev \
                 stylelint-config-standard@${NPM_STYLELINT_CONFIG_STANDARD_VERSION} \
                 stylelint-config-sass-guidelines@${NPM_STYLELINT_CONFIG_SASS_GUIDELINES_VERSION} \
                 stylelint-scss@${NPM_STYLELINT_SCSS_VERSION} \
+                gherkin-lint@${NPM_GHERKIN_LINT_VERSION} \
                 graphql@${NPM_GRAPHQL_VERSION} \
                 graphql-schema-linter@${NPM_GRAPHQL_SCHEMA_LINTER_VERSION} \
                 npm-groovy-lint@${NPM_GROOVY_LINT_VERSION} \
@@ -367,6 +574,7 @@ RUN npm --no-cache install --ignore-scripts --omit=dev \
                 markdownlint-cli@${NPM_MARKDOWNLINT_CLI_VERSION} \
                 markdown-link-check@${NPM_MARKDOWN_LINK_CHECK_VERSION} \
                 markdown-table-formatter@${NPM_MARKDOWN_TABLE_FORMATTER_VERSION} \
+                pyright@${NPM_PYRIGHT_VERSION} \
                 @ls-lint/ls-lint@${NPM_LS_LINT_LS_LINT_VERSION} \
                 secretlint@${NPM_SECRETLINT_VERSION} \
                 @secretlint/secretlint-rule-preset-recommend@${NPM_SECRETLINT_SECRETLINT_RULE_PRESET_RECOMMEND_VERSION} \
@@ -398,7 +606,15 @@ ENV PATH="/node-deps/node_modules/.bin:${PATH}" \
 #############################################################################################
 
 #GEM__START
-
+RUN echo 'gem: --no-document' >> ~/.gemrc && \
+    gem install \
+          puppet-lint:${GEM_PUPPET_LINT_VERSION} \
+          rubocop:${GEM_RUBOCOP_VERSION} \
+          rubocop-github:${GEM_RUBOCOP_GITHUB_VERSION} \
+          rubocop-performance:${GEM_RUBOCOP_PERFORMANCE_VERSION} \
+          rubocop-rails:${GEM_RUBOCOP_RAILS_VERSION} \
+          rubocop-rake:${GEM_RUBOCOP_RAKE_VERSION} \
+          rubocop-rspec:${GEM_RUBOCOP_RSPEC_VERSION}
 #GEM__END
 
 ##############################
@@ -408,6 +624,7 @@ ENV PATH="/node-deps/node_modules/.bin:${PATH}" \
 #############################################################################################
 
 #COPY__START
+COPY --from=composer/composer:2-bin /composer /usr/bin/composer
 COPY --link --from=actionlint /usr/local/bin/actionlint /usr/bin/actionlint
 # shellcheck is a dependency for actionlint
 COPY --link --from=shellcheck /bin/shellcheck /usr/bin/shellcheck
@@ -416,23 +633,182 @@ COPY --link --from=shellcheck /bin/shellcheck /usr/bin/shellcheck
 COPY --link --from=shfmt /bin/shfmt /usr/bin/
 COPY --link --from=hadolint /bin/hadolint /usr/bin/hadolint
 COPY --link --from=editorconfig-checker /usr/bin/ec /usr/bin/editorconfig-checker
+COPY --link --from=revive /usr/bin/revive /usr/bin/revive
 COPY --link --from=kubeconform /kubeconform /usr/bin/
+COPY --link --from=chktex /usr/bin/chktex /usr/bin/
 COPY --link --from=protolint /usr/local/bin/protolint /usr/bin/
+COPY --link --from=dustilock /usr/bin/dustilock /usr/bin/dustilock
 COPY --link --from=gitleaks /usr/bin/gitleaks /usr/bin/
+COPY --link --from=kics /app/bin/kics /usr/bin/kics
+COPY --from=kics /app/bin/assets /usr/bin/assets
 COPY --link --from=trufflehog /usr/bin/trufflehog /usr/bin/
 COPY --link --from=vale /bin/vale /bin/vale
 COPY --link --from=lychee /usr/local/bin/lychee /usr/bin/
+COPY --link --from=tflint /usr/local/bin/tflint /usr/bin/
+COPY --link --from=terrascan /go/bin/terrascan /usr/bin/
+COPY --link --from=terragrunt /usr/local/bin/terragrunt /usr/bin/
+COPY --link --from=terragrunt /bin/terraform /usr/bin/
 #COPY__END
 
 #############################################################################################
 ## @generated by .automation/build.py using descriptor files, please do not update manually ##
 #############################################################################################
 #OTHER__START
-# KOTLIN installation
+RUN rc-update add docker boot && (rc-service docker start || true) \
+# ARM installation
+    && curl -L https://github.com/PowerShell/PowerShell/releases/download/v${POWERSHELL_VERSION}/powershell-${POWERSHELL_VERSION}-linux-musl-x64.tar.gz -o /tmp/powershell.tar.gz \
+    && mkdir -p /opt/microsoft/powershell/7 \
+    && tar zxf /tmp/powershell.tar.gz -C /opt/microsoft/powershell/7 \
+    && chmod +x /opt/microsoft/powershell/7/pwsh \
+    && ln -s /opt/microsoft/powershell/7/pwsh /usr/bin/pwsh
+
+#
+# CLOJURE installation
+ENV LANG=C.UTF-8
+RUN ALPINE_GLIBC_BASE_URL="https://github.com/sgerrand/alpine-pkg-glibc/releases/download" && \
+    ALPINE_GLIBC_BASE_PACKAGE_FILENAME="glibc-$ALPINE_GLIBC_PACKAGE_VERSION.apk" && \
+    ALPINE_GLIBC_BIN_PACKAGE_FILENAME="glibc-bin-$ALPINE_GLIBC_PACKAGE_VERSION.apk" && \
+    ALPINE_GLIBC_I18N_PACKAGE_FILENAME="glibc-i18n-$ALPINE_GLIBC_PACKAGE_VERSION.apk" && \
+    apk add --no-cache --virtual=.build-dependencies wget ca-certificates && \
+    echo \
+        "-----BEGIN PUBLIC KEY-----\
+        MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApZ2u1KJKUu/fW4A25y9m\
+        y70AGEa/J3Wi5ibNVGNn1gT1r0VfgeWd0pUybS4UmcHdiNzxJPgoWQhV2SSW1JYu\
+        tOqKZF5QSN6X937PTUpNBjUvLtTQ1ve1fp39uf/lEXPpFpOPL88LKnDBgbh7wkCp\
+        m2KzLVGChf83MS0ShL6G9EQIAUxLm99VpgRjwqTQ/KfzGtpke1wqws4au0Ab4qPY\
+        KXvMLSPLUp7cfulWvhmZSegr5AdhNw5KNizPqCJT8ZrGvgHypXyiFvvAH5YRtSsc\
+        Zvo9GI2e2MaZyo9/lvb+LbLEJZKEQckqRj4P26gmASrZEPStwc+yqy1ShHLA0j6m\
+        1QIDAQAB\
+        -----END PUBLIC KEY-----" | sed 's/   */\n/g' > "/etc/apk/keys/sgerrand.rsa.pub" && \
+    wget --quiet --tries=10 --waitretry=10 \
+        "$ALPINE_GLIBC_BASE_URL/$ALPINE_GLIBC_PACKAGE_VERSION/$ALPINE_GLIBC_BASE_PACKAGE_FILENAME" \
+        "$ALPINE_GLIBC_BASE_URL/$ALPINE_GLIBC_PACKAGE_VERSION/$ALPINE_GLIBC_BIN_PACKAGE_FILENAME" \
+        "$ALPINE_GLIBC_BASE_URL/$ALPINE_GLIBC_PACKAGE_VERSION/$ALPINE_GLIBC_I18N_PACKAGE_FILENAME" && \
+    mv /etc/nsswitch.conf /etc/nsswitch.conf.bak && \
+    apk add --no-cache --force-overwrite \
+        "$ALPINE_GLIBC_BASE_PACKAGE_FILENAME" \
+        "$ALPINE_GLIBC_BIN_PACKAGE_FILENAME" \
+        "$ALPINE_GLIBC_I18N_PACKAGE_FILENAME" && \
+    \
+    mv /etc/nsswitch.conf.bak /etc/nsswitch.conf && \
+    rm "/etc/apk/keys/sgerrand.rsa.pub" && \
+    (/usr/glibc-compat/bin/localedef --force --inputfile POSIX --charmap UTF-8 "$LANG" || true) && \
+    echo "export LANG=$LANG" > /etc/profile.d/locale.sh && \
+    \
+    apk del glibc-i18n && \
+    \
+    rm "/root/.wget-hsts" && \
+    apk del .build-dependencies && \
+    rm \
+        "$ALPINE_GLIBC_BASE_PACKAGE_FILENAME" \
+        "$ALPINE_GLIBC_BIN_PACKAGE_FILENAME" \
+        "$ALPINE_GLIBC_I18N_PACKAGE_FILENAME" \
+#
+# CSHARP installation
+    && apk add --no-cache dotnet9-sdk
+ENV PATH="${PATH}:/root/.dotnet/tools"
+#
+# DART installation
+# Next line commented because already managed by another linter
+# ENV LANG=C.UTF-8
+# Next line commented because already managed by another linter
+# RUN ALPINE_GLIBC_BASE_URL="https://github.com/sgerrand/alpine-pkg-glibc/releases/download" && \
+#     ALPINE_GLIBC_BASE_PACKAGE_FILENAME="glibc-$ALPINE_GLIBC_PACKAGE_VERSION.apk" && \
+#     ALPINE_GLIBC_BIN_PACKAGE_FILENAME="glibc-bin-$ALPINE_GLIBC_PACKAGE_VERSION.apk" && \
+#     ALPINE_GLIBC_I18N_PACKAGE_FILENAME="glibc-i18n-$ALPINE_GLIBC_PACKAGE_VERSION.apk" && \
+#     apk add --no-cache --virtual=.build-dependencies wget ca-certificates && \
+#     echo \
+#         "-----BEGIN PUBLIC KEY-----\
+#         MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApZ2u1KJKUu/fW4A25y9m\
+#         y70AGEa/J3Wi5ibNVGNn1gT1r0VfgeWd0pUybS4UmcHdiNzxJPgoWQhV2SSW1JYu\
+#         tOqKZF5QSN6X937PTUpNBjUvLtTQ1ve1fp39uf/lEXPpFpOPL88LKnDBgbh7wkCp\
+#         m2KzLVGChf83MS0ShL6G9EQIAUxLm99VpgRjwqTQ/KfzGtpke1wqws4au0Ab4qPY\
+#         KXvMLSPLUp7cfulWvhmZSegr5AdhNw5KNizPqCJT8ZrGvgHypXyiFvvAH5YRtSsc\
+#         Zvo9GI2e2MaZyo9/lvb+LbLEJZKEQckqRj4P26gmASrZEPStwc+yqy1ShHLA0j6m\
+#         1QIDAQAB\
+#         -----END PUBLIC KEY-----" | sed 's/   */\n/g' > "/etc/apk/keys/sgerrand.rsa.pub" && \
+#     wget --quiet --tries=10 --waitretry=10 \
+#         "$ALPINE_GLIBC_BASE_URL/$ALPINE_GLIBC_PACKAGE_VERSION/$ALPINE_GLIBC_BASE_PACKAGE_FILENAME" \
+#         "$ALPINE_GLIBC_BASE_URL/$ALPINE_GLIBC_PACKAGE_VERSION/$ALPINE_GLIBC_BIN_PACKAGE_FILENAME" \
+#         "$ALPINE_GLIBC_BASE_URL/$ALPINE_GLIBC_PACKAGE_VERSION/$ALPINE_GLIBC_I18N_PACKAGE_FILENAME" && \
+#     mv /etc/nsswitch.conf /etc/nsswitch.conf.bak && \
+#     apk add --no-cache --force-overwrite \
+#         "$ALPINE_GLIBC_BASE_PACKAGE_FILENAME" \
+#         "$ALPINE_GLIBC_BIN_PACKAGE_FILENAME" \
+#         "$ALPINE_GLIBC_I18N_PACKAGE_FILENAME" && \
+#     \
+#     mv /etc/nsswitch.conf.bak /etc/nsswitch.conf && \
+#     rm "/etc/apk/keys/sgerrand.rsa.pub" && \
+#     (/usr/glibc-compat/bin/localedef --force --inputfile POSIX --charmap UTF-8 "$LANG" || true) && \
+#     echo "export LANG=$LANG" > /etc/profile.d/locale.sh && \
+#     \
+#     apk del glibc-i18n && \
+#     \
+#     rm "/root/.wget-hsts" && \
+#     apk del .build-dependencies && \
+#     rm \
+#         "$ALPINE_GLIBC_BASE_PACKAGE_FILENAME" \
+#         "$ALPINE_GLIBC_BIN_PACKAGE_FILENAME" \
+#         "$ALPINE_GLIBC_I18N_PACKAGE_FILENAME"
+#
+# JAVA installation
 ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 ENV PATH="$JAVA_HOME/bin:${PATH}"
 #
+# KOTLIN installation
+# Next line commented because already managed by another linter
+# ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+# Next line commented because already managed by another linter
+# ENV PATH="$JAVA_HOME/bin:${PATH}"
+#
+# LUA installation
+RUN wget --tries=5 https://www.lua.org/ftp/lua-5.3.5.tar.gz -O - -q | tar -xzf - \
+    && cd lua-5.3.5 \
+    && make linux \
+    && make install \
+    && cd .. && rm -r lua-5.3.5/ \
+#
+# PHP installation
+    && update-alternatives --install /usr/bin/php php /usr/bin/php84 110
+# Managed with COPY --from=composer/composer:2-bin /composer /usr/bin/composer
+ENV PATH="/root/.composer/vendor/bin:${PATH}"
+ENV PHP_CS_FIXER_IGNORE_ENV=true
+#
+# POWERSHELL installation
+# Next line commented because already managed by another linter
+# RUN curl -L https://github.com/PowerShell/PowerShell/releases/download/v${POWERSHELL_VERSION}/powershell-${POWERSHELL_VERSION}-linux-musl-x64.tar.gz -o /tmp/powershell.tar.gz \
+#     && mkdir -p /opt/microsoft/powershell/7 \
+#     && tar zxf /tmp/powershell.tar.gz -C /opt/microsoft/powershell/7 \
+#     && chmod +x /opt/microsoft/powershell/7/pwsh \
+#     && ln -s /opt/microsoft/powershell/7/pwsh /usr/bin/pwsh
+#
+# SALESFORCE installation
+# Next line commented because already managed by another linter
+# ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+# Next line commented because already managed by another linter
+# ENV PATH="$JAVA_HOME/bin:${PATH}"
+RUN sf plugins install @salesforce/plugin-packaging@${NPM_SALESFORCE_PLUGIN_PACKAGING_VERSION} \
+    && echo y|sf plugins install sfdx-hardis@${SFDX_HARDIS_VERSION} \
+    && (npm cache clean --force || true) \
+    && rm -rf /root/.npm/_cacache
+ENV SF_AUTOUPDATE_DISABLE=true SF_CLI_DISABLE_AUTOUPDATE=true
+#
+# SCALA installation
+# Next line commented because already managed by another linter
+# ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+# Next line commented because already managed by another linter
+# ENV PATH="$JAVA_HOME/bin:${PATH}"
+RUN curl --retry-all-errors --retry 10 -fLo coursier https://git.io/coursier-cli && \
+        chmod +x coursier
+
+#
 # TYPESCRIPT installation
+#
+# VBDOTNET installation
+# Next line commented because already managed by another linter
+# RUN apk add --no-cache dotnet9-sdk
+# Next line commented because already managed by another linter
+# ENV PATH="${PATH}:/root/.dotnet/tools"
 #
 # actionlint installation
 # Managed with COPY --link --from=actionlint /usr/local/bin/actionlint /usr/bin/actionlint
@@ -443,8 +819,16 @@ ENV PATH="$JAVA_HOME/bin:${PATH}"
 #
 # spectral installation
 #
+# arm-ttk installation
+ENV ARM_TTK_PSD1="${ARM_TTK_DIRECTORY}/arm-ttk/arm-ttk/arm-ttk.psd1"
+RUN curl --retry 5 --retry-delay 5 -sLO "https://github.com/Azure/arm-ttk/releases/download/${ARM_TTK_VERSION}/${ARM_TTK_NAME}" \
+    && unzip "${ARM_TTK_NAME}" -d "${ARM_TTK_DIRECTORY}" \
+    && rm "${ARM_TTK_NAME}" \
+    && ln -sTf "${ARM_TTK_PSD1}" /usr/bin/arm-ttk \
+    && chmod a+x /usr/bin/arm-ttk \
+#
 # bash-exec installation
-RUN printf '#!/bin/bash \n\nif [[ -x "$1" ]]; then exit 0; else echo "Error: File:[$1] is not executable"; exit 1; fi' > /usr/bin/bash-exec \
+    && printf '#!/bin/bash \n\nif [[ -x "$1" ]]; then exit 0; else echo "Error: File:[$1] is not executable"; exit 1; fi' > /usr/bin/bash-exec \
     && chmod +x /usr/bin/bash-exec \
 #
 # shellcheck installation
@@ -454,11 +838,47 @@ RUN printf '#!/bin/bash \n\nif [[ -x "$1" ]]; then exit 0; else echo "Error: Fil
 # shfmt installation
 # Managed with COPY --link --from=shfmt /bin/shfmt /usr/bin/
 #
+# bicep_linter installation
+    && curl --retry 5 --retry-delay 5 -sLo ${BICEP_EXE} "https://github.com/Azure/bicep/releases/download/v${BICEP_VERSION}/bicep-linux-musl-x64" \
+    && chmod +x "${BICEP_EXE}" \
+    && mv "${BICEP_EXE}" "${BICEP_DIR}" \
+#
+# cpplint installation
+#
+# clj-kondo installation
+    && curl --retry 5 --retry-delay 5 -sLO https://raw.githubusercontent.com/clj-kondo/clj-kondo/refs/tags/v${CLJ_KONDO_VERSION}/script/install-clj-kondo \
+    && chmod +x install-clj-kondo \
+    && ./install-clj-kondo \
+#
+# cljstyle installation
+    && curl --retry 5 --retry-delay 5 -sLO https://raw.githubusercontent.com/greglook/cljstyle/main/util/install-cljstyle \
+    && chmod +x install-cljstyle \
+    && ./install-cljstyle --static --version "$CLJ_STYLE_VERSION" \
+#
+# cfn-lint installation
+#
 # coffeelint installation
 #
 # jscpd installation
 #
+# cpplint installation
+#
+# csharpier installation
+    && dotnet tool install --allow-roll-forward --global csharpier --version "${CSHARP_CSHARPIER_VERSION}" \
+#
+# roslynator installation
+    && dotnet tool install --allow-roll-forward --global roslynator.dotnet.cli --version "${CSHARP_ROSLYNATOR_VERSION}" \
+#
 # stylelint installation
+#
+# dartanalyzer installation
+    && wget --tries=5 https://storage.googleapis.com/dart-archive/channels/stable/release/${DART_VERSION}/sdk/dartsdk-linux-x64-release.zip -O - -q | unzip -q - \
+    && mkdir -p /usr/lib/dart \
+    && mv dart-sdk/* /usr/lib/dart/ \
+    && chmod +x /usr/lib/dart/bin/dart \
+    && rm -r dart-sdk/
+
+ENV PATH="/usr/lib/dart/bin:${PATH}"
 #
 # hadolint installation
 # Managed with COPY --link --from=hadolint /bin/hadolint /usr/bin/hadolint
@@ -467,7 +887,17 @@ RUN printf '#!/bin/bash \n\nif [[ -x "$1" ]]; then exit 0; else echo "Error: Fil
 # Managed with COPY --link --from=editorconfig-checker /usr/bin/ec /usr/bin/editorconfig-checker
 #
 # dotenv-linter installation
-    && wget -q -O - https://raw.githubusercontent.com/dotenv-linter/dotenv-linter/master/install.sh | sh -s
+RUN wget -q -O - https://raw.githubusercontent.com/dotenv-linter/dotenv-linter/master/install.sh | sh -s \
+#
+# gherkin-lint installation
+#
+# golangci-lint installation
+    && wget -O- -nv https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s "v${GO_GOLANGCI_LINT_VERSION}" \
+    && golangci-lint --version
+
+#
+# revive installation
+# Managed with COPY --link --from=revive /usr/bin/revive /usr/bin/revive
 #
 # graphql-schema-linter installation
 #
@@ -477,6 +907,25 @@ ENV JAVA_HOME_17=/usr/lib/jvm/java-17-openjdk
 # djlint installation
 #
 # htmlhint installation
+#
+# checkstyle installation
+RUN --mount=type=secret,id=GITHUB_TOKEN CHECKSTYLE_LATEST=$(curl -s \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer $(cat /run/secrets/GITHUB_TOKEN)" \
+    https://api.github.com/repos/checkstyle/checkstyle/releases/latest \
+        | grep browser_download_url \
+        | grep ".jar" \
+        | cut -d '"' -f 4) \
+    && curl --retry 5 --retry-delay 5 -sSL $CHECKSTYLE_LATEST \
+        --output /usr/bin/checkstyle
+
+#
+# pmd installation
+RUN wget --quiet https://github.com/pmd/pmd/releases/download/pmd_releases%2F${PMD_VERSION}/pmd-dist-${PMD_VERSION}-bin.zip && \
+    unzip pmd-dist-${PMD_VERSION}-bin.zip || echo "Error unzipping" && \
+    rm pmd-dist-${PMD_VERSION}-bin.zip || echo "Error rm" && \
+    mv pmd-bin-${PMD_VERSION} /usr/bin/pmd || echo "Error mv" && \
+    chmod +x /usr/bin/pmd/bin/pmd || echo "Error chmod" \
 #
 # eslint installation
 #
@@ -495,7 +944,7 @@ ENV JAVA_HOME_17=/usr/lib/jvm/java-17-openjdk
 # eslint installation
 #
 # ktlint installation
-RUN curl --retry 5 --retry-delay 5 -sSLO https://github.com/pinterest/ktlint/releases/download/${KTLINT_VERSION}/ktlint && \
+    && curl --retry 5 --retry-delay 5 -sSLO https://github.com/pinterest/ktlint/releases/download/${KTLINT_VERSION}/ktlint && \
     chmod a+x ktlint && \
     mv "ktlint" /usr/bin/ \
 #
@@ -514,22 +963,120 @@ RUN curl --retry 5 --retry-delay 5 -sSLO https://github.com/pinterest/ktlint/rel
     && ln -s /lib/libc.so.6 /usr/lib/libresolv.so.2 && \
     curl --retry 5 --retry-delay 5 -sLv https://raw.githubusercontent.com/kubescape/kubescape/master/install.sh | /bin/bash -s -- -v "v${KUBERNETES_KUBESCAPE_VERSION}" \
 #
+# chktex installation
+# Managed with COPY --link --from=chktex /usr/bin/chktex /usr/bin/
+    && cd ~ && touch .chktexrc && cd / \
+#
+# luacheck installation
+    && wget --tries=5 https://github.com/cvega/luarocks/archive/v${LUA_LUACHECK_VERSION}-super-linter.tar.gz -O - -q | tar -xzf - \
+    && cd luarocks-${LUA_LUACHECK_VERSION}-super-linter \
+    && ./configure --with-lua-include=/usr/local/include \
+    && make \
+    && make -b install \
+    && cd .. && rm -r luarocks-${LUA_LUACHECK_VERSION}-super-linter/ \
+    && luarocks install luacheck \
+    && cd / \
+#
+# selene installation
+#
+# stylua installation
+#
 # markdownlint installation
 #
 # markdown-link-check installation
 #
 # markdown-table-formatter installation
 #
+# perlcritic installation
+    && curl -fsSL https://raw.githubusercontent.com/skaji/cpm/refs/tags/${PERL_PERLCRITIC_VERSION}/cpm | perl - install -g --show-build-log-on-failure --without-build --without-test --without-runtime Perl::Critic \
+    && rm -rf /root/.perl-cpm
+
+#
+# phpcs installation
+RUN --mount=type=secret,id=GITHUB_TOKEN GITHUB_AUTH_TOKEN="$(cat /run/secrets/GITHUB_TOKEN)" && export GITHUB_AUTH_TOKEN && composer global require squizlabs/php_codesniffer:${PHP_SQUIZLABS_PHP_CODESNIFFER_VERSION} bartlett/sarif-php-converters:${PHP_BARTLETT_SARIF_PHP_CONVERTERS_VERSION}
+
+#
+# phpstan installation
+RUN --mount=type=secret,id=GITHUB_TOKEN GITHUB_AUTH_TOKEN="$(cat /run/secrets/GITHUB_TOKEN)" && export GITHUB_AUTH_TOKEN && composer config --global allow-plugins.phpstan/extension-installer true && composer global require phpstan/phpstan:${PHP_PHPSTAN_PHPSTAN_VERSION} phpstan/extension-installer:${PHP_PHPSTAN_EXTENSION_INSTALLER_VERSION} bartlett/sarif-php-converters:${PHP_BARTLETT_SARIF_PHP_CONVERTERS_VERSION}
+#
+# psalm installation
+RUN --mount=type=secret,id=GITHUB_TOKEN GITHUB_AUTH_TOKEN="$(cat /run/secrets/GITHUB_TOKEN)" && export GITHUB_AUTH_TOKEN && composer global require vimeo/psalm:${PHP_VIMEO_PSALM_VERSION}
+
+#
+# phplint installation
+RUN --mount=type=secret,id=GITHUB_TOKEN GITHUB_AUTH_TOKEN="$(cat /run/secrets/GITHUB_TOKEN)" && export GITHUB_AUTH_TOKEN && composer global require overtrue/phplint:${PHP_OVERTRUE_PHPLINT_VERSION} bartlett/sarif-php-converters:${PHP_BARTLETT_SARIF_PHP_CONVERTERS_VERSION}
+
+#
+# php-cs-fixer installation
+RUN --mount=type=secret,id=GITHUB_TOKEN GITHUB_AUTH_TOKEN="$(cat /run/secrets/GITHUB_TOKEN)" && export GITHUB_AUTH_TOKEN && composer global require friendsofphp/php-cs-fixer:${PHP_FRIENDSOFPHP_PHP_CS_FIXER_VERSION} --with-all-dependencies
+
+#
+# powershell installation
+RUN pwsh -c 'Install-Module -Name PSScriptAnalyzer -RequiredVersion ${PSSA_VERSION} -Scope AllUsers -Force'
+#
+# powershell_formatter installation
+# Next line commented because already managed by another linter
+# RUN pwsh -c 'Install-Module -Name PSScriptAnalyzer -RequiredVersion ${PSSA_VERSION} -Scope AllUsers -Force'
+#
 # protolint installation
 # Managed with COPY --link --from=protolint /usr/local/bin/protolint /usr/bin/
 #
+# puppet-lint installation
+#
+# pylint installation
+#
+# black installation
+#
+# flake8 installation
+#
+# isort installation
+#
+# bandit installation
+#
+# mypy installation
+ENV MYPY_CACHE_DIR=/tmp
+#
+# pyright installation
+#
+# ruff installation
+#
+# ruff-format installation
+#
+# lintr installation
+RUN mkdir -p /home/r-library \
+    && cp -r /usr/lib/R/library/ /home/r-library/ \
+    && Rscript -e "install.packages(c('lintr','purrr'), repos = 'https://cloud.r-project.org/')" \
+    && R -e "install.packages(list.dirs('/home/r-library',recursive = FALSE), repos = NULL, type = 'source')" \
+#
+# raku installation
+    && curl -L "https://github.com/nxadm/rakudo-pkg/releases/download/v${RAKU_RAKU_VERSION}/rakudo-pkg-Alpine${RAKU_RAKU_ALPINE_VERSION}_${RAKU_RAKU_VERSION}-01_x86_64.apk" > "rakudo-pkg-Alpine${RAKU_RAKU_ALPINE_VERSION}_${RAKU_RAKU_VERSION}-01_x86_64.apk" \
+    && apk add --no-cache --allow-untrusted "rakudo-pkg-Alpine${RAKU_RAKU_ALPINE_VERSION}_${RAKU_RAKU_VERSION}-01_x86_64.apk" \
+    && rm "rakudo-pkg-Alpine${RAKU_RAKU_ALPINE_VERSION}_${RAKU_RAKU_VERSION}-01_x86_64.apk"
+
+ENV PATH="~/.raku/bin:/opt/rakudo-pkg/bin:/opt/rakudo-pkg/share/perl6/site/bin:$PATH"
+#
 # checkov installation
+#
+# devskim installation
+# Next line commented because already managed by another linter
+# RUN apk add --no-cache dotnet9-sdk
+# Next line commented because already managed by another linter
+# ENV PATH="${PATH}:/root/.dotnet/tools"
+RUN dotnet tool install --allow-roll-forward --global Microsoft.CST.DevSkim.CLI --version ${REPOSITORY_DEVSKIM_VERSION} \
+#
+# dustilock installation
+# Managed with COPY --link --from=dustilock /usr/bin/dustilock /usr/bin/dustilock
 #
 # gitleaks installation
 # Managed with COPY --link --from=gitleaks /usr/bin/gitleaks /usr/bin/
 #
 # grype installation
-    && curl -sSfL https://raw.githubusercontent.com/anchore/grype/refs/tags/v${REPOSITORY_GRYPE_VERSION}/install.sh | sh -s -- -b /usr/local/bin \
+    && curl -sSfL https://raw.githubusercontent.com/anchore/grype/refs/tags/v${REPOSITORY_GRYPE_VERSION}/install.sh | sh -s -- -b /usr/local/bin
+#
+# kics installation
+# Managed with COPY --link --from=kics /app/bin/kics /usr/bin/kics
+ENV KICS_QUERIES_PATH=/usr/bin/assets/queries KICS_LIBRARIES_PATH=/usr/bin/assets/libraries
+# Managed with COPY --from=kics /app/bin/assets /usr/bin/assets
 #
 # ls-lint installation
 #
@@ -538,7 +1085,7 @@ RUN curl --retry 5 --retry-delay 5 -sSLO https://github.com/pinterest/ktlint/rel
 # semgrep installation
 #
 # syft installation
-    && curl -sSfL https://raw.githubusercontent.com/anchore/syft/refs/tags/v${REPOSITORY_SYFT_VERSION}/install.sh | sh -s -- -b /usr/local/bin \
+RUN curl -sSfL https://raw.githubusercontent.com/anchore/syft/refs/tags/v${REPOSITORY_SYFT_VERSION}/install.sh | sh -s -- -b /usr/local/bin \
 #
 # trivy installation
     && wget --tries=5 -q -O - https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin "v${REPOSITORY_TRIVY_VERSION}" \
@@ -546,11 +1093,43 @@ RUN curl --retry 5 --retry-delay 5 -sSLO https://github.com/pinterest/ktlint/rel
 #
 # trivy-sbom installation
     && wget --tries=5 -q -O - https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin "v${REPOSITORY_TRIVY_SBOM_VERSION}" \
-    && (trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress)
-
+    && (trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress || trivy image --download-db-only --no-progress) \
 #
 # trufflehog installation
 # Managed with COPY --link --from=trufflehog /usr/bin/trufflehog /usr/bin/
+#
+# rst-lint installation
+#
+# rstcheck installation
+#
+# rstfmt installation
+#
+# rubocop installation
+#
+# sfdx-scanner-apex installation
+    && sf plugins install @salesforce/sfdx-scanner@${SALESFORCE_SFDX_SCANNER_VERSION} \
+    && (npm cache clean --force || true) \
+    && rm -rf /root/.npm/_cacache \
+#
+# sfdx-scanner-aura installation
+# Next line commented because already managed by another linter
+# RUN sf plugins install @salesforce/sfdx-scanner@${SALESFORCE_SFDX_SCANNER_VERSION} \
+#     && (npm cache clean --force || true) \
+#     && rm -rf /root/.npm/_cacache
+#
+# sfdx-scanner-lwc installation
+# Next line commented because already managed by another linter
+# RUN sf plugins install @salesforce/sfdx-scanner@${SALESFORCE_SFDX_SCANNER_VERSION} \
+#     && (npm cache clean --force || true) \
+#     && rm -rf /root/.npm/_cacache
+#
+# lightning-flow-scanner installation
+    && echo y|sf plugins install lightning-flow-scanner@${LIGHTNING_FLOW_SCANNER_VERSION} \
+    && (npm cache clean --force || true) \
+    && rm -rf /root/.npm/_cacache \
+#
+# scalafix installation
+    && ./coursier install scalafix --quiet --install-dir /usr/bin && rm -rf /root/.cache \
 #
 # snakemake installation
 #
@@ -568,7 +1147,30 @@ RUN curl --retry 5 --retry-delay 5 -sSLO https://github.com/pinterest/ktlint/rel
 #
 # sqlfluff installation
 #
+# tsqllint installation
+# Next line commented because already managed by another linter
+# RUN apk add --no-cache dotnet9-sdk
+# Next line commented because already managed by another linter
+# ENV PATH="${PATH}:/root/.dotnet/tools"
+    && dotnet tool install --allow-roll-forward --global TSQLLint --version ${SQL_TSQLLINT_VERSION}
+#
+# swiftlint installation
+# renovate: datasource=docker depName=ghcr.io/realm/swiftlint
+ENV SWIFT_SWIFTLINT_VERSION=0.59.1
+#
 # tekton-lint installation
+#
+# tflint installation
+# Managed with COPY --link --from=tflint /usr/local/bin/tflint /usr/bin/
+#
+# terrascan installation
+# Managed with COPY --link --from=terrascan /go/bin/terrascan /usr/bin/
+#
+# terragrunt installation
+# Managed with COPY --link --from=terragrunt /usr/local/bin/terragrunt /usr/bin/
+#
+# terraform-fmt installation
+# Managed with COPY --link --from=terragrunt /bin/terraform /usr/bin/
 #
 # eslint installation
 #
@@ -619,7 +1221,7 @@ ENV BUILD_DATE=$BUILD_DATE \
     BUILD_VERSION=$BUILD_VERSION
 
 #FLAVOR__START
-ENV MEGALINTER_FLAVOR=javascript
+ENV MEGALINTER_FLAVOR=all
 #FLAVOR__END
 
 #########################################

@@ -1,0 +1,127 @@
+name: Mirror docker image
+
+on:
+  workflow_dispatch:
+    inputs:
+      source-image:
+        description: 'Source of the image on ghcr.io'
+        required: true
+      target-image:
+        description: 'Target of the image hosted on docker hub'
+        required: true
+      free-space-before:
+        description: 'Free space on the runner before pulling and pushing docker image'
+        required: false
+        default: 'true'
+
+permissions: {}
+
+jobs:
+
+  copy-to-docker-hub-alpha:
+    if: github.ref_name == 'alpha' && endsWith(github.event.inputs.source-image,'alpha') && endsWith(github.event.inputs.target-image,'alpha')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    environment:
+      name: alpha
+    steps:
+      # Free disk space
+      - name: Free Disk space
+        if: github.event.inputs.free-space-before == 'true'
+        shell: bash
+        run: |
+          sudo rm -rf /usr/local/lib/android  # will release about 10 GB if you don't need Android
+          sudo rm -rf /usr/share/dotnet # will release about 20GB if you don't need .NET
+      # Login to docker hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      # Copy ghrc.io image to Docker Hub
+      - name: Pull image from GHCR
+        env:
+          SOURCE_IMAGE: ${{ github.event.inputs.source-image }}
+        run: docker pull "$SOURCE_IMAGE"
+      - name: Tag image for Docker Hub
+        env:
+          SOURCE_IMAGE: ${{ github.event.inputs.source-image }}
+          TARGET_IMAGE: ${{ github.event.inputs.target-image }}
+        run: docker tag "$SOURCE_IMAGE" "$TARGET_IMAGE"
+      - name: Push image to Docker Hub
+        env:
+          TARGET_IMAGE: ${{ github.event.inputs.target-image }}
+        run: docker push "$TARGET_IMAGE"
+
+  copy-to-docker-hub-main:
+    if: github.ref_name == 'main' && endsWith(github.event.inputs.source-image,'beta') && endsWith(github.event.inputs.target-image,'beta')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    environment:
+      name: beta
+    steps:
+      # Free disk space
+      - name: Free Disk space
+        if: github.event.inputs.free-space-before == 'true'
+        shell: bash
+        run: |
+          sudo rm -rf /usr/local/lib/android  # will release about 10 GB if you don't need Android
+          sudo rm -rf /usr/share/dotnet # will release about 20GB if you don't need .NET
+      # Login to docker hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      # Copy ghrc.io image to Docker Hub
+      - name: Pull image from GHCR
+        env:
+          SOURCE_IMAGE: ${{ github.event.inputs.source-image }}
+        run: docker pull "$SOURCE_IMAGE"
+      - name: Tag image for Docker Hub
+        env:
+          SOURCE_IMAGE: ${{ github.event.inputs.source-image }}
+          TARGET_IMAGE: ${{ github.event.inputs.target-image }}
+        run: docker tag "$SOURCE_IMAGE" "$TARGET_IMAGE"
+      - name: Push image to Docker Hub
+        env:
+          TARGET_IMAGE: ${{ github.event.inputs.target-image }}
+        run: docker push "$TARGET_IMAGE"
+
+  copy-to-docker-hub-release:
+    if: github.ref_name == 'main' && contains(github.event.inputs.source-image,'v8') && (contains(github.event.inputs.target-image,'v8') || contains(github.event.inputs.target-image,'latest'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    environment:
+      name: release
+    steps:
+      # Free disk space
+      - name: Free Disk space
+        if: github.event.inputs.free-space-before == 'true'
+        shell: bash
+        run: |
+          sudo rm -rf /usr/local/lib/android  # will release about 10 GB if you don't need Android
+          sudo rm -rf /usr/share/dotnet # will release about 20GB if you don't need .NET
+      # Login to docker hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      # Copy ghrc.io image to Docker Hub
+      - name: Pull image from GHCR
+        env:
+          SOURCE_IMAGE: ${{ github.event.inputs.source-image }}
+        run: docker pull "$SOURCE_IMAGE"
+      - name: Tag image for Docker Hub
+        env:
+          SOURCE_IMAGE: ${{ github.event.inputs.source-image }}
+          TARGET_IMAGE: ${{ github.event.inputs.target-image }}
+        run: docker tag "$SOURCE_IMAGE" "$TARGET_IMAGE"
+      - name: Push image to Docker Hub
+        env:
+          TARGET_IMAGE: ${{ github.event.inputs.target-image }}
+        run: docker push "$TARGET_IMAGE"
