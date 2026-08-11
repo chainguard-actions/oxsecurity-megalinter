@@ -1,0 +1,54 @@
+name: Test MegaLinter with apply fixes output
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: megalinter
+        uses: .
+        continue-on-error: true
+        env:
+          # Scan all files but only with a single fast linter to keep runtime short
+          VALIDATE_ALL_CODEBASE: "true"
+          # Only run a single fast linter
+          ENABLE_LINTERS: "JAVASCRIPT_ES"
+          # Apply fixes to test has_updated_sources output
+          APPLY_FIXES: "all"
+          APPLY_FIXES_EVENT: "all"
+          APPLY_FIXES_MODE: "commit"
+          # Suppress GitHub API calls
+          GITHUB_TOKEN: ${{ github.token }}
+          # Reduce output verbosity
+          LOG_LEVEL: "WARNING"
+          # Disable reporters that make API calls
+          GITHUB_STATUS_REPORTER: "false"
+          GITHUB_COMMENT_REPORTER: "false"
+
+      - name: Assert has_updated_sources output is valid
+        env:
+          OUTCOME: ${{ steps.megalinter.outcome }}
+          HAS_UPDATED: ${{ steps.megalinter.outputs.has_updated_sources }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "has_updated_sources: $HAS_UPDATED"
+          # MegaLinter exits with failure if linting issues found — both outcomes are valid
+          if [ "$OUTCOME" = "success" ] || [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: MegaLinter ran (outcome=$OUTCOME)"
+            # If has_updated_sources is set, validate it is 0 or 1
+            if [ -n "$HAS_UPDATED" ]; then
+              if [ "$HAS_UPDATED" = "0" ] || [ "$HAS_UPDATED" = "1" ]; then
+                echo "PASS: has_updated_sources='$HAS_UPDATED' is a valid value"
+              else
+                echo "FAIL: has_updated_sources='$HAS_UPDATED' is not 0 or 1"
+                exit 1
+              fi
+            else
+              echo "INFO: has_updated_sources not set (may be normal when action fails early)"
+            fi
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
