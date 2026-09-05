@@ -1,0 +1,237 @@
+---
+#########################
+#########################
+## Deploy Docker Image Flavors ##
+#########################
+#########################
+
+#
+# Documentation:
+# https://help.github.com/en/articles/workflow-syntax-for-github-actions
+#
+
+#######################################
+# Start the job on all push to main #
+#######################################
+name: "Build & Deploy - BETA Flavors"
+on:
+  push:
+    branches:
+      - "main"
+      - "FlavoredMegaLinters"
+      - dbgbeta
+    paths:
+      - ".github/workflows/**"
+      - "Dockerfile"
+      - "flavors/**"
+      - "megalinter/**"
+      - "mega-linter-runner/**"
+      - "**/linter-versions.json"
+      - "TEMPLATES/**"
+      - ".trivyignore"
+      - "**/.sh"
+
+###############
+# Set the Job #
+###############
+permissions: {}
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Name the Job
+    name: BETA/Flavors
+    # Set the agent to run on
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      packages: write
+      # Require writing security events to upload SARIF file to security tab
+      security-events: write
+    environment:
+      name: beta
+    strategy:
+      fail-fast: false
+      matrix:
+        # flavors-start
+        flavor:
+          [
+            "c_cpp",
+            "ci_light",
+            "cupcake",
+            "documentation",
+            "dotnet",
+            "dotnetweb",
+            "formatters",
+            "go",
+            "java",
+            "javascript",
+            "php",
+            "python",
+            "ruby",
+            "rust",
+            "salesforce",
+            "security",
+            "swift",
+            "terraform",
+          ]
+# flavors-end
+        platform: ["linux/amd64"]
+    # Only run this on the main repo
+    if: >-
+      (
+        github.repository == 'oxsecurity/megalinter'
+        && !contains(github.event.head_commit.message, 'skip deploy')
+        && !contains(github.event.head_commit.message, 'Release MegaLinter v')
+      )
+    ##################
+    # Load all steps #
+    ##################
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Docker Metadata action
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        id: meta
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}-${{ matrix.flavor }}
+          flavor: |
+            latest=false
+            prefix=beta
+          tags: |
+            type=raw,value=
+
+      - name: Docker Metadata action (Docker Hub)
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        id: meta-dhub
+        with:
+          images: |
+            ${{ github.repository }}-${{ matrix.flavor }}
+          flavor: |
+            latest=false
+            prefix=beta
+          tags: |
+            type=raw,value=
+
+      - name: Docker Metadata action (Worker)
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        id: meta-w
+        with:
+          images: |
+            name=ghcr.io/${{ github.repository }}-worker-${{ matrix.flavor }}
+          flavor: |
+            latest=false
+            prefix=beta
+          tags: |
+            type=raw,value=
+
+      # - name: Docker Metadata action (Worker Docker Hub)
+      #   uses: docker/metadata-action@v5.5.1
+      #   id: meta-w-dhub
+      #   with:
+      #     images: |
+      #       name=docker.io/${{ github.repository }}-worker-${{ matrix.flavor }}
+      #     flavor: |
+      #       latest=false
+      #       prefix=beta
+      #     tags: |
+      #       type=raw,value=
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Free disk space
+      - name: Free Disk space
+        shell: bash
+        run: |
+          sudo rm -rf /usr/local/lib/android  # will release about 10 GB if you don't need Android
+          sudo rm -rf /usr/share/dotnet # will release about 20GB if you don't need .NET
+          sudo rm -rf /opt/hostedtoolcache/CodeQL # large cache
+          sudo rm -rf /opt/hostedtoolcache/go # Go toolcache
+
+      - name: Build Image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          file: flavors/${{ matrix.flavor }}/Dockerfile
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+            BUILD_VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+            BUILD_REVISION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
+          load: false
+          push: ${{ github.event_name != 'pull_request' }}
+          secrets: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=beta-flavor-${{ matrix.flavor }}-${{ matrix.platform }},ignore-error=true
+          cache-to: type=gha,mode=max,scope=beta-flavor-${{ matrix.flavor }}-${{ matrix.platform }},compression=zstd
+
+      # Docker Hub mirroring is disabled — MegaLinter is published to ghcr.io only.
+      # - name: Invoke Mirror docker image workflow (Main image)
+      #   uses: benc-uk/workflow-dispatch@7a027648b88c2413826b6ddd6c76114894dc5ec4 # v1
+      #   with:
+      #     workflow: mirror-docker-image.yml
+      #     inputs: '{ "source-image": "${{ steps.meta.outputs.tags }}", "target-image": "${{ steps.meta-dhub.outputs.tags }}" }'
+
+      # - name: Build Worker Image
+      #   uses: docker/build-push-action@v7
+      #   with:
+      #     context: .
+      #     file: Dockerfile-worker
+      #     platforms: linux/amd64
+      #     build-args: |
+      #       MEGALINTER_BASE_IMAGE=${{ fromJson(steps.meta-w.outputs.json).tags[0]}}
+      #       BUILD_DATE=${{ fromJSON(steps.meta-w.outputs.json).labels['org.opencontainers.image.created'] }}
+      #       BUILD_VERSION=${{ fromJSON(steps.meta-w.outputs.json).labels['org.opencontainers.image.version'] }}
+      #       BUILD_REVISION=${{ fromJSON(steps.meta-w.outputs.json).labels['org.opencontainers.image.revision'] }}
+      #     load: false
+      #     push: ${{ github.event_name != 'pull_request' }}
+      #     secrets: |
+      #       GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+      #     tags: ${{ steps.meta-w.outputs.tags }}
+
+      # - name: Invoke Mirror docker image workflow (Main image)
+      #   uses: benc-uk/workflow-dispatch@v1
+      #   with:
+      #     workflow: mirror-docker-image.yml
+      #     inputs: '{ "source-image": "${{ steps.meta-w.outputs.tags }}", "target-image": "${{ steps.meta-w-dhub.outputs.tags }}" }'
+
+      ##############################################
+      # Check Docker image security with Trivy #
+      ##############################################
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          # renovate: datasource=github-releases depName=aquasecurity/trivy
+          version: "v0.74.0"
+          image-ref: "${{ fromJson(steps.meta.outputs.json).tags[0]}}"
+          format: "table"
+          exit-code: "1"
+          ignore-unfixed: true
+          scanners: vuln
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
+          timeout: 10m0s
+        env:
+            ACTIONS_RUNTIME_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # - name: Run OSV-Scanner vulnerability scanner
+      #   uses: google/osv-scanner-action/osv-scanner-action@v2.3.5
+      #   with:
+      #     scan-args: |-
+      #       --docker ${{ fromJson(steps.meta.outputs.json).tags[0] }}

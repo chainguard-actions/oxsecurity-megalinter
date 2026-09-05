@@ -1,0 +1,143 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "megalinter"
+dynamic = ["version"]
+description = "MegaLinter"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+keywords = []
+authors = [{ name = "Nicolas Vuillamy", email = "nicolas.vuillamy@gmail.com" }]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: CPython",
+]
+dependencies = [
+  "gitpython",
+  "jsonpickle",
+  "langchain-core~=1.6.1",
+  "pygithub",
+  "pyjwt>=2.12.0",
+  "pytablewriter",
+  "python-gitlab",
+  "pyyaml",
+  "redis",
+  "requests",
+  "urllib3>=2.5.0",
+]
+
+[project.optional-dependencies]
+llm = [
+  "langchain-openai~=1.6.0",
+  "langchain-anthropic~=1.7.0",
+  "langchain-google-genai~=4.3.1",
+  "langchain-mistralai~=1.1.1",
+  "langchain-ollama~=1.1.0",
+  "langchain-deepseek~=1.1.0",
+  "langchain-community~=0.4.1",
+]
+huggingface = [
+  "langchain-huggingface",
+  "transformers",
+  "torch",
+]
+all-llm = [
+  "langchain-openai~=1.6.0",
+  "langchain-anthropic~=1.7.0",
+  "langchain-google-genai~=4.3.1",
+  "langchain-mistralai~=1.1.1",
+  "langchain-ollama~=1.1.0",
+  "langchain-deepseek~=1.1.0",
+  "langchain-community~=0.4.1",
+  "langchain-huggingface",
+  "transformers",
+  "torch",
+]
+
+[project.urls]
+Homepage = "https://megalinter.io/"
+Documentation = "https://megalinter.io/"
+Repository = "https://github.com/oxsecurity/megalinter.git"
+Source = "https://github.com/oxsecurity/megalinter"
+Issues = "https://github.com/oxsecurity/megalinter/issues"
+Changelog = "https://github.com/oxsecurity/megalinter/blob/main/CHANGELOG.md"
+
+[tool.hatch.version]
+path = "megalinter/__about__.py"
+
+[tool.hatch.envs.default]
+installer = "uv"
+
+[tool.hatch.envs.docs]
+dependencies = [
+  "zensical==0.0.57",
+  "markdown",
+  # Zensical-compatible fork of mike; GitHub-only, not published on PyPI.
+  # Kept in sync with .config/python/dev/requirements.txt.
+  # renovate: datasource=git-refs depName=https://github.com/squidfunk/mike branch=master
+  "mike @ git+https://github.com/squidfunk/mike@2d4ad799442f4592db8ad53b179bfb33db8c69ac",
+  "pymdown-extensions",
+  "mdx_truly_sane_lists",
+  "jsonschema",
+  "json-schema-for-humans",
+  "giturlparse",
+  "webpreview",
+  "github-dependents-info",
+]
+
+[tool.hatch.envs.hatch-test]
+default-args = [""]
+randomize = true
+parallel = true
+retries = 2
+
+[tool.hatch.envs.docs.scripts]
+# Zensical's search engine emits ./site/search.json, not the
+# ./site/search/search_index.json that mkdocs produced, so the old
+# prettify step has no target and has been dropped.
+build-only = ["zensical build --clean {args}"]
+build = ["build-only {args}"]
+serve = "zensical serve --dev-addr localhost:8000 {args}"
+
+[tool.hatch.envs.build]
+template = "docs"
+[tool.hatch.envs.build.scripts]
+all = ["build --doc --stats --dependents {args}", "hatch run docs:build"]
+build-sh = "./build.sh {args}"
+build-py = "hatch run python .automation/build.py {args}"
+build = ["build-py", "hatch run docs:build"]
+docs = ["./build.sh --doc {args}", "hatch run docs:build"]
+stats = "build --stats"
+changelog = "hatch run python .automation/build.py --changelog {args}"
+
+[tool.hatch.envs.types]
+extra-dependencies = ["mypy>=1.0.0"]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:megalinter}"
+
+[tool.codespell]
+ignore-words-list = "astroid,developper,edn,errorprone,lama,lication,shepard,thirdparty,valu"
+skip = "./docs/descriptors/*,./docs/licenses/*,*.css,*.lock,*/spell_codespell.md"
+
+[tool.coverage.run]
+source_pkgs = ["megalinter"]
+branch = false
+parallel = true
+omit = ["megalinter/__about__.py"]
+
+[tool.coverage.paths]
+megalinter = ["megalinter", "*/megalinter/megalinter"]
+tests = [".automation/test", "*/megalinter/tests"]
+
+[tool.coverage.report]
+exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
+
+[tool.ruff]
+src = ["megalinter"]
+extend-exclude = [".automation/test"]

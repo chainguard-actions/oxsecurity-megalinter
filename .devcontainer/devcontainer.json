@@ -1,0 +1,57 @@
+{
+  "name": "MegaLinter",
+  "image": "mcr.microsoft.com/devcontainers/python:3-3.14-trixie",
+  "containerEnv": {
+    // renovate: datasource=npm depName=markdown-table-formatter
+    "NPM_MARKDOWN_TABLE_FORMATTER_VERSION": "1.7.0"
+  },
+  "features": {
+    "ghcr.io/devcontainers-extra/features/coverage-py:2": {},
+    "ghcr.io/devcontainers/features/node:": {
+      "version": "24.17.0"
+    }
+  },
+  "remoteEnv": {
+    "NVM_DIR": "/usr/local/share/nvm",
+    "PATH": "${containerEnv:PATH}:/usr/local/share/nvm/current/bin"
+  },
+  "postCreateCommand": {
+    "pip_install_dev_requirements": "pip3 --disable-pip-version-check --no-cache-dir install -r .config/python/dev/requirements.txt",
+    "npm_install_markdown-table-formatter": "npm install markdown-table-formatter@${NPM_MARKDOWN_TABLE_FORMATTER_VERSION} -g"
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": true,
+        "python.formatting.autopep8Path": "/usr/local/py-utils/bin/autopep8",
+        "python.formatting.blackPath": "/usr/local/py-utils/bin/black",
+        "python.formatting.yapfPath": "/usr/local/py-utils/bin/yapf",
+        "python.linting.banditPath": "/usr/local/py-utils/bin/bandit",
+        "python.linting.flake8Path": "/usr/local/py-utils/bin/flake8",
+        "python.linting.mypyPath": "/usr/local/py-utils/bin/mypy",
+        "python.linting.pycodestylePath": "/usr/local/py-utils/bin/pycodestyle",
+        "python.linting.pydocstylePath": "/usr/local/py-utils/bin/pydocstyle",
+        "python.linting.pylintPath": "/usr/local/py-utils/bin/pylint"
+      },
+      "extensions": [
+        "esbenp.prettier-vscode",
+        "exiasr.hadolint",
+        "foxundermoon.shell-format",
+        "github.vscode-pull-request-github",
+        "hbenl.vscode-test-explorer",
+        "LittleFoxTeam.vscode-python-test-adapter",
+        "mhutchie.git-graph",
+        "matangover.mypy",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "rogalmic.bash-debug",
+        "streetsidesoftware.code-spell-checker",
+        "stylelint.vscode-stylelint",
+        "timonwong.shellcheck"
+      ]
+    }
+  },
+  "remoteUser": "vscode"
+}

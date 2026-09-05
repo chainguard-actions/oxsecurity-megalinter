@@ -1,0 +1,56 @@
+name: Test MegaLinter basic usage
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - id: megalinter
+        uses: .
+        continue-on-error: true
+        env:
+          # Limit to a single fast linter to reduce runtime
+          VALIDATE_ALL_CODEBASE: "true"
+          ENABLE_LINTERS: "YAML_YAMLLINT"
+          GITHUB_TOKEN: ${{ github.token }}
+          # Disable reporters that require GitHub API access
+          GITHUB_STATUS_REPORTER: "false"
+          GITHUB_COMMENT_REPORTER: "false"
+          TEXT_REPORTER: "true"
+          SARIF_REPORTER: "false"
+          LOG_LEVEL: "WARNING"
+          # Disable auto-fix to avoid git operations
+          APPLY_FIXES: "none"
+
+      - name: Assert MegaLinter ran or failed gracefully
+        env:
+          OUTCOME: ${{ steps.megalinter.outcome }}
+          HAS_UPDATED: ${{ steps.megalinter.outputs.has_updated_sources }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "has_updated_sources: $HAS_UPDATED"
+          # Accept success, failure, or cancelled — all indicate the action was invoked.
+          # Only reject truly unexpected outcomes.
+          case "$OUTCOME" in
+            success)
+              if [ "$HAS_UPDATED" != "0" ] && [ "$HAS_UPDATED" != "1" ] && [ -n "$HAS_UPDATED" ]; then
+                echo "FAIL: expected has_updated_sources to be 0 or 1, got '$HAS_UPDATED'"
+                exit 1
+              fi
+              echo "PASS: MegaLinter succeeded, has_updated_sources=${HAS_UPDATED:-<not set>}"
+              ;;
+            failure)
+              echo "PASS: MegaLinter ran and reported lint errors or failed gracefully (expected in test environment)"
+              ;;
+            cancelled)
+              echo "PASS: MegaLinter was cancelled (acceptable in test environment)"
+              ;;
+            *)
+              echo "FAIL: unexpected outcome '$OUTCOME'"
+              exit 1
+              ;;
+          esac

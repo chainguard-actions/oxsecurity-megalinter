@@ -1,0 +1,93 @@
+---
+descriptor_id: PERL
+descriptor_type: language
+file_extensions:
+  - ".pl"
+  - ".pm"
+  - ".t"
+  - ""
+file_contains_regex_extensions:
+  - ""
+file_contains_regex:
+  - "^#!/usr/bin/env perl"
+  - "^#!/usr/bin/perl"
+install:
+  apk:
+    - perl
+supported_platforms:
+  platform:
+    - linux/amd64
+    - linux/arm64
+linters:
+  # PERL CRITIC
+  - linter_name: perlcritic
+    linter_text: |
+      **perlcritic** is a comprehensive static source code analysis engine for Perl that enforces coding standards and best practices. Based primarily on Damian Conway's "Perl Best Practices" book, it serves as an extensible framework for creating and applying consistent coding standards across Perl projects.
+
+      **Key Features:**
+
+      - **Extensive Policy Library**: Over 100 built-in policies covering bugs, security, maintainability, complexity, and code style
+      - **Configurable Severity Levels**: Five severity levels (1-5) allowing fine-tuned control over policy enforcement
+      - **Best Practices Foundation**: Policies based on "Perl Best Practices" and community-established coding standards
+      - **Theme-Based Organization**: Policies grouped by themes like bugs, security, performance, and maintainability
+      - **Inline Annotations**: Selective policy disabling through source code comments and annotations
+      - **Extensible Framework**: Support for custom policies and organizational coding standards
+      - **Detailed Reporting**: Comprehensive violation reports with explanations and suggested fixes
+      - **Flexible Configuration**: Project-specific configuration files for team-wide standards enforcement
+    linter_url: https://metacpan.org/pod/Perl::Critic
+    linter_repo: https://github.com/Perl-Critic/Perl-Critic
+    linter_megalinter_ref_url: https://github.com/Perl-Critic/Perl-Critic/pull/1110
+    linter_spdx_license: Artistic-1.0-Perl OR GPL-1.0-or-later
+    linter_rules_url: https://metacpan.org/pod/Perl::Critic#THE-POLICIES
+    linter_banner_image_url: https://chrisdolan.net/madmongers/images/perl-critic-logo.gif
+    linter_rules_configuration_url: https://metacpan.org/pod/Perl::Critic#CONFIGURATION
+    linter_rules_inline_disable_url: https://metacpan.org/pod/Perl::Critic#BENDING-THE-RULES
+    cli_lint_mode: list_of_files
+    supported_cli_lint_modes:
+      - file
+      - list_of_files
+      - project
+    cli_lint_mode_project_extra_args_after:
+      - .
+    cli_help_arg_name: "--help"
+    cli_lint_errors_count: regex_count
+    cli_lint_errors_regex: "\\(Severity: [0-9]+\\)"
+    help_command_return_code: 2
+    common_linter_errors:
+      - identifier: PERL_PERLCRITIC_ERROR_CONFIG_INVALID
+        regex: "(Unable to parse profile|Invalid (option|setting) .* in profile|Perl::Critic::ConfigErrors)"
+        message: |-
+          perlcritic could not parse its configuration file (`.perlcriticrc`, INI-like format).
+          Resolutions:
+            - Verify `.perlcriticrc` syntax: global settings at the top, then policy sections like `[Subroutines::ProhibitExplicitReturnUndef]`.
+            - Make sure every referenced policy is actually installed (try `perlcritic --list` to see available policies).
+            - Run with `perlcritic --profile /dev/null myfile.pl` to confirm the failure is config-related.
+      - identifier: PERL_PERLCRITIC_ERROR_POLICY_NOT_FOUND
+        regex: "Policy '[^']+' is not installed"
+        message: |-
+          perlcritic's profile references a policy module that is not installed in the MegaLinter image.
+          Resolutions:
+            - Remove the unknown policy section from `.perlcriticrc`, or
+            - Pre-install the missing CPAN module via a pre-command in your .mega-linter.yml (cpanm installs globally):
+                PERL_PERLCRITIC_PRE_COMMANDS:
+                  - command: "cpanm --notest Perl::Critic::Policy::YourPolicy"
+                    cwd: "root"
+                    continue_if_failed: false
+    examples:
+      - "perlcritic myfile.pl"
+    install:
+      dockerfile:
+        - |
+          # renovate: datasource=github-tags depName=skaji/cpm
+          ARG PERL_PERLCRITIC_VERSION=v1.1.5
+        - |
+          # cpm compiles XS modules during installation: the toolchain is only
+          # needed within this RUN and evicted from the final layers
+          RUN apk add --no-cache --virtual .perl-build-deps gcc make musl-dev perl-dev \
+              && curl -fsSL https://raw.githubusercontent.com/skaji/cpm/refs/tags/${PERL_PERLCRITIC_VERSION}/cpm | perl - install -g --show-build-log-on-failure --without-build --without-test --without-runtime Perl::Critic \
+              && rm -rf /root/.perl-cpm \
+              && apk del .perl-build-deps
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64

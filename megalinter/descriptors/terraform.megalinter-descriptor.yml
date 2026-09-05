@@ -1,0 +1,436 @@
+---
+descriptor_id: TERRAFORM
+descriptor_type: tooling_format
+descriptor_flavors:
+  - cupcake
+  - formatters
+  - terraform
+file_extensions:
+  - ".tf"
+linters:
+  # TFLINT
+  - class: TfLintLinter
+    can_output_sarif: true
+    linter_name: tflint
+    linter_spdx_license: MPL-2.0
+    name: TERRAFORM_TFLINT
+    descriptor_flavors:
+      - cupcake
+      - terraform
+      - security
+    linter_url: https://github.com/terraform-linters/tflint
+    linter_repo: https://github.com/terraform-linters/tflint
+    linter_megalinter_ref_url: "no"
+    linter_rules_url: https://github.com/terraform-linters/tflint-ruleset-terraform/blob/main/docs/rules/README.md
+    linter_rules_configuration_url: https://github.com/terraform-linters/tflint/blob/master/docs/user-guide/config.md
+    linter_rules_inline_disable_url: https://github.com/terraform-linters/tflint/blob/master/docs/user-guide/annotations.md
+    linter_text: |
+      **TFLint** is a pluggable Terraform linter that provides deep inspection of Terraform configurations with a focus on catching errors that terraform plan might miss. It offers extensive static analysis capabilities including provider-specific checks, deprecated syntax detection, and infrastructure best practices validation.
+
+      **Key Features:**
+
+      - **Deep Terraform Analysis**: Goes beyond basic syntax checking to validate Terraform semantics and logic
+      - **Provider-Specific Rules**: Specialized rule sets for AWS, Azure, GCP, and other cloud providers
+      - **Plugin Architecture**: Extensible with community and custom plugins for specific use cases
+      - **Performance Optimized**: Fast analysis suitable for large Terraform codebases
+      - **Configuration Flexibility**: Highly configurable with .tflint.hcl files for project-specific requirements
+      - **Error Prevention**: Catches common issues before terraform plan/apply execution
+      - **Module Support**: Analyzes Terraform modules and their usage patterns
+      - **Detailed Reporting**: Clear error messages with file locations and remediation suggestions
+
+      > If you are using the GitHub action please use the `TERRAFORM_TFLINT_UNSECURED_ENV_VARIABLES: GITHUB_TOKEN` to prevent plugin download issues
+
+      > If `tflint --init` can not download plugins (for example when `GITHUB_TOKEN` targets a GitHub Enterprise instance and not github.com), use the tflint native host-specific token variable `GITHUB_TOKEN_github_com`: create a github.com Personal Access Token, set it in `GITHUB_TOKEN_github_com`, then allow tflint to read it.
+
+      > ```yaml
+      > TERRAFORM_TFLINT_UNSECURED_ENV_VARIABLES:
+      >   - GITHUB_TOKEN_github_com
+      > ```
+
+      > tflint gives priority to `GITHUB_TOKEN_{host}` over `GITHUB_TOKEN`, so other linters and reporters keep using your regular `GITHUB_TOKEN`.
+
+      > `PAT_GITHUB_COM` does the same thing and is **deprecated**: it will be removed in a future major release, use `GITHUB_TOKEN_github_com` instead.
+
+      Note: It's recommended to create your own `.tflint.hcl` custom config file tailored to your project's specific needs.
+      The default configuration enables all supported languages and rules, which may not be optimal for every project.
+    linter_icon_png_url: https://raw.githubusercontent.com/oxsecurity/megalinter/main/docs/assets/icons/linters/tflint.png
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - file
+      - list_of_files
+      - project
+    cli_lint_errors_count: regex_count
+    cli_lint_errors_regex: "Error:"
+    cli_lint_warnings_count: regex_count
+    cli_lint_warnings_regex: "Warning:"
+    config_file_name: .tflint.hcl
+    cli_lint_mode_project_extra_args_after:
+      - --recursive
+    cli_sarif_args:
+      - --format
+      - sarif
+    variables:
+      - name: TERRAFORM_TFLINT_SECURED_ENV
+        default_value: true
+        description: Allows to send the full env to **tflint --init**. Initialized with default value `true`. Set to `false` to allow `tflint --init` to access your env vars.
+      - name: PAT_GITHUB_COM
+        default_value: ""
+        description: "DEPRECATED: github.com Personal Access Token copied into GITHUB_TOKEN when running **tflint --init**. Use tflint native variable `GITHUB_TOKEN_github_com` instead (with `TERRAFORM_TFLINT_UNSECURED_ENV_VARIABLES`), as PAT_GITHUB_COM will be removed in a future major release."
+    test_folder: terraform_tflint
+    examples:
+      - "tflint"
+      - "tflint -c .tflint.hcl"
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=docker depName=ghcr.io/terraform-linters/tflint
+          ARG TERRAFORM_TFLINT_VERSION=0.64.0
+        - FROM ghcr.io/terraform-linters/tflint:v${TERRAFORM_TFLINT_VERSION} AS tflint
+        - COPY --link --from=tflint /usr/local/bin/tflint /usr/bin/
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+  # TERRAGRUNT
+  - linter_name: terragrunt
+    linter_text: |
+      **Terragrunt** is a thin wrapper for Terraform that provides tools for keeping your Terraform configurations DRY, working with multiple Terraform modules, and managing remote state. It helps validate Terragrunt configurations and ensures that your infrastructure code follows best practices for modularity, reusability, and maintainability.
+
+      **Key Features:**
+
+      - **DRY Terraform Code**: Eliminates repetition by allowing shared configurations across multiple environments
+      - **Remote State Management**: Simplifies backend configuration and remote state management across projects
+      - **Module Composition**: Orchestrates multiple Terraform modules with dependency management
+      - **Configuration Validation**: Validates Terragrunt HCL configurations for syntax and semantic errors
+      - **Environment Management**: Provides patterns for managing infrastructure across multiple environments
+      - **Lock File Support**: Handles Terraform provider lock files consistently across environments
+      - **Dependency Graph**: Automatically manages dependencies between Terraform modules and configurations
+      - **Parallel Execution**: Runs Terraform operations in parallel where dependencies allow
+      - **Error Handling**: Enhanced error handling and debugging capabilities for complex infrastructure deployments
+    name: TERRAFORM_TERRAGRUNT
+    linter_spdx_license: MIT
+    file_extensions:
+      - ".hcl"
+    file_names_not_ends_with:
+      - ".tflint.hcl"
+    descriptor_flavors:
+      - cupcake
+      - terraform
+      - security
+    linter_url: https://docs.terragrunt.com/reference/cli/commands/hcl/fmt/
+    linter_repo: https://github.com/gruntwork-io/terragrunt
+    linter_megalinter_ref_url: https://github.com/gruntwork-io/terragrunt/pull/6657
+    linter_rules_configuration_url: https://terragrunt.gruntwork.io/docs/getting-started/quick-start/#add-terragrunthcl-to-your-project
+    linter_image_url: https://github.com/gruntwork-io/terragrunt/blob/master/docs/assets/img/favicon/ms-icon-310x310.png
+    linter_icon_png_url: https://raw.githubusercontent.com/oxsecurity/megalinter/main/docs/assets/icons/linters/terragrunt.png
+    config_file_name: terragrunt.hcl
+    cli_config_arg_name: "--config"
+    cli_lint_extra_args:
+      - "hcl"
+      - "fmt"
+      - "--check"
+    cli_lint_mode: file
+    supported_cli_lint_modes:
+      - file
+    cli_lint_mode_file_extra_args_after:
+      - "--file"
+    cli_lint_fix_arg_name: "--megalinter-fix-flag" # Workaround for MegaLinter
+    cli_lint_fix_remove_args:
+      - "--check"
+    test_folder: terraform_terragrunt
+    common_linter_errors:
+      - identifier: TERRAFORM_TERRAGRUNT_ERROR_CONFIG_PARSE
+        regex: "Error parsing Terragrunt config"
+        message: |-
+          Terragrunt could not parse a referenced terragrunt.hcl configuration file.
+          Verify that include/dependency blocks resolve and that referenced files exist relative to the working directory.
+    examples:
+      - "terragrunt hcl fmt --check --file myfile.hcl"
+      - "terragrunt hcl fmt --check --config terragrunt.hcl --file myfile.hcl"
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=docker depName=alpine/terragrunt
+          ARG TERRAFORM_TERRAGRUNT_VERSION=1.16.0
+        - FROM alpine/terragrunt:${TERRAFORM_TERRAGRUNT_VERSION} AS terragrunt
+        - COPY --link --from=terragrunt /usr/local/bin/terragrunt /usr/bin/
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+  # TERRAFORM_FMT
+  - linter_name: terraform-fmt
+    linter_text: |
+      **terraform fmt** is the built-in Terraform command for automatically formatting Terraform configuration files to ensure consistent style and formatting. It rewrites Terraform configuration files to a canonical format and style, making code more readable and maintainable, following HashiCorp's official style conventions.
+
+      **Key Features:**
+
+      - **Official Formatter**: Built into Terraform core, ensuring compatibility and consistency with HashiCorp standards
+      - **Canonical Formatting**: Applies consistent indentation, spacing, and line breaks across all Terraform files
+      - **Automatic Fixing**: Rewrites files in-place to fix formatting issues automatically
+      - **Diff Mode**: Shows formatting differences without modifying files for review purposes
+      - **Recursive Processing**: Can format entire directory trees and module structures
+      - **Check Mode**: Validates formatting without making changes, perfect for validation
+      - **HCL Syntax Support**: Handles all HashiCorp Configuration Language constructs correctly
+      - **Fast Performance**: Optimized for quick formatting of large Terraform codebases
+      - **Zero Configuration**: Works out of the box with no setup or configuration required
+      - **Team Consistency**: Ensures uniform code style across development teams and projects
+    name: TERRAFORM_TERRAFORM_FMT
+    is_formatter: true
+    linter_spdx_license: BUSL-1.1
+    linter_url: https://developer.hashicorp.com/terraform/cli/commands/fmt
+    linter_repo: https://github.com/hashicorp/terraform
+    linter_banner_image_url: https://www.datocms-assets.com/2885/1629941242-logo-terraform-main.svg
+    cli_executable: terraform
+    cli_lint_mode: file
+    supported_cli_lint_modes:
+      - file
+    cli_lint_extra_args:
+      - "fmt"
+      - "--diff"
+      - "--check"
+    cli_lint_fix_arg_name: "--megalinter-fix-flag" # Workaround for MegaLinter
+    cli_lint_fix_remove_args:
+      - "--diff"
+      - "--check"
+    examples:
+      - "terraform fmt myfile.tf"
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=docker depName=alpine/terragrunt
+          ARG TERRAFORM_TERRAGRUNT_VERSION=1.16.0
+        - FROM alpine/terragrunt:${TERRAFORM_TERRAGRUNT_VERSION} AS terragrunt
+        - COPY --link --from=terragrunt /bin/terraform /usr/bin/
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+    ide:
+      idea:
+        - name: HashiCorp Terraform / HCL language support
+          url: https://plugins.jetbrains.com/plugin/7808-hashicorp-terraform--hcl-language-support
+          id: org.intellij.plugins.hcl
+      sublime:
+        - name: Terrafmt
+          url: https://packagecontrol.io/packages/Terrafmt
+      vscode:
+        - name: HashiCorp Terraform
+          url: https://marketplace.visualstudio.com/items?itemName=HashiCorp.terraform
+    test_folder: terraform_fmt
+    version_extract_regex: "(?<=Terraform v)\\d+(\\.\\d+)+"
+  # TOFU FMT
+  - linter_name: tofu-fmt
+    linter_text: |
+      **tofu fmt** is the built-in OpenTofu command that rewrites configuration files to a canonical format and style. OpenTofu is the community-driven, MPL-2.0 licensed fork of Terraform hosted by the Linux Foundation, and its formatter follows the same canonical style as `terraform fmt`.
+
+      **Key Features:**
+
+      - **Official Formatter**: Built into OpenTofu core, so formatting always matches the version of OpenTofu you run
+      - **Open Source**: OpenTofu stays under the **MPL-2.0** license, unlike Terraform which moved to BUSL-1.1
+      - **Canonical Formatting**: Applies consistent indentation, spacing and alignment across all configuration files
+      - **Broad File Coverage**: Formats configuration (`.tf`), variables (`.tfvars`) and test (`.tftest.hcl`) files
+      - **Automatic Fixing**: Rewrites files in place when **APPLY_FIXES** is enabled
+      - **Diff Mode**: Shows the formatting changes it would make, so reviews stay readable
+      - **Zero Configuration**: Intentionally opinionated, with no configuration or ignore file to maintain
+
+      ## Analyzed files
+
+      By default this linter only analyzes **`.tofu`** files, the OpenTofu specific extension that Terraform does not recognize. `.tf` files are left to [terraform fmt](https://megalinter.io/latest/descriptors/terraform_terraform_fmt/), so both formatters can stay enabled without doing the same work twice.
+
+      ## Formatting .tf files with OpenTofu
+
+      If your project runs OpenTofu and keeps its configuration in `.tf` files, point this linter at them and disable the Terraform one, so a single formatter owns them:
+
+      ```yaml
+      TERRAFORM_TOFU_FMT_FILE_EXTENSIONS: [".tofu", ".tf", ".tfvars"]
+      DISABLE_LINTERS: [TERRAFORM_TERRAFORM_FMT]
+      ```
+
+      `tofu fmt` also formats `.tftest.hcl` and `.tofutest.hcl` test files. They are not analyzed by default because the `.hcl` extension is already claimed by [terragrunt](https://megalinter.io/latest/descriptors/terraform_terragrunt/) in this descriptor: add them to `TERRAFORM_TOFU_FMT_FILE_EXTENSIONS` only if you also disable `TERRAFORM_TERRAGRUNT`, or you would format them twice.
+    name: TERRAFORM_TOFU_FMT
+    is_formatter: true
+    # OpenTofu specific extension, unknown to Terraform: keeps this linter from
+    # overlapping with TERRAFORM_TERRAFORM_FMT on the descriptor level ".tf"
+    file_extensions:
+      - ".tofu"
+    linter_spdx_license: MPL-2.0
+    linter_url: https://opentofu.org/docs/cli/commands/fmt/
+    linter_repo: https://github.com/opentofu/opentofu
+    linter_rules_configuration_url: https://opentofu.org/docs/language/syntax/style/
+    linter_speed: 5
+    linter_icon_png_url: https://raw.githubusercontent.com/opentofu/brand-artifacts/main/full/transparent/PNG/on-light.png
+    linter_banner_image_url: https://raw.githubusercontent.com/opentofu/brand-artifacts/main/full/transparent/SVG/on-light.svg
+    cli_executable: tofu
+    cli_lint_mode: list_of_files
+    supported_cli_lint_modes:
+      - list_of_files
+    cli_lint_extra_args:
+      - "fmt"
+      - "-diff"
+      - "-check"
+    cli_lint_fix_arg_name: "--megalinter-fix-flag" # Workaround for MegaLinter
+    cli_lint_fix_remove_args:
+      - "-diff"
+      - "-check"
+    examples:
+      - "tofu fmt -diff -check myfile.tf"
+      - "tofu fmt myfile.tf"
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=docker depName=ghcr.io/opentofu/opentofu
+          ARG TERRAFORM_TOFU_FMT_VERSION=1.12.6-minimal
+        - FROM ghcr.io/opentofu/opentofu:${TERRAFORM_TOFU_FMT_VERSION} AS opentofu
+        - COPY --link --from=opentofu /usr/local/bin/tofu /usr/bin/
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+    ide:
+      idea:
+        - name: Terraform and HCL
+          url: https://plugins.jetbrains.com/plugin/7808-terraform-and-hcl
+          id: org.intellij.plugins.hcl
+      vscode:
+        - name: OpenTofu
+          url: https://marketplace.visualstudio.com/items?itemName=OpenTofu.vscode-opentofu
+    test_folder: tofu_fmt
+    version_extract_regex: "(?<=OpenTofu v)\\d+(\\.\\d+)+"
+  # TOFU VALIDATE
+  - class: TofuValidateLinter
+    linter_name: tofu-validate
+    linter_text: |
+      **tofu validate** is the built-in OpenTofu command that checks whether a configuration is internally consistent and semantically valid, without reading any state or contacting any infrastructure. OpenTofu is the community-driven, MPL-2.0 licensed fork of Terraform hosted by the Linux Foundation.
+
+      It reports the errors that neither a formatter nor a rule-based linter can see: unsupported or missing arguments, wrong attribute types, references to undeclared variables, locals, resources or outputs, invalid expressions, and broken module input contracts.
+
+      **Key Features:**
+
+      - **Official Validator**: Built into OpenTofu core, so the checks always match the version of OpenTofu you run
+      - **Open Source**: OpenTofu stays under the **MPL-2.0** license, unlike Terraform which moved to BUSL-1.1
+      - **Schema Aware**: Validates resource and data source arguments against the real provider schemas
+      - **Expression Checking**: Resolves variable, local, output and module references across the whole module
+      - **No Infrastructure Access**: Never reads the state, never contacts a backend and never needs cloud credentials
+      - **Zero Configuration**: Intentionally opinionated, with no configuration or ignore file to maintain
+
+      ## Analyzed files
+
+      By default this linter only analyzes **`.tofu`** files, the OpenTofu specific extension that Terraform does not recognize, exactly like [tofu fmt](https://megalinter.io/latest/descriptors/terraform_tofu_fmt/). Nothing is validated in a repository that keeps its OpenTofu configuration in `.tf` files until you add the extension:
+
+      ```yaml
+      TERRAFORM_TOFU_VALIDATE_FILE_EXTENSIONS: [".tofu", ".tf"]
+      ```
+
+      Keeping `.tofu` as the only default leaves `.tf` free for a future `terraform validate` linter, so enabling both would not validate the same repository twice.
+
+      Mind that the extensions select the **directories** to validate, not the files to report on. `tofu validate` always validates a whole module, so once a directory has been selected, every `.tf` and `.tofu` file it contains is parsed and can produce diagnostics.
+
+      Do not add **`.tfvars`**, even though [tofu fmt](https://megalinter.io/latest/descriptors/terraform_tofu_fmt/) does format those files. `tofu validate` ignores variable definition files entirely, including auto-loaded ones, so a `.tfvars` file can never produce a diagnostic here. Worse, a directory holding only `.tfvars` files is an *empty directory* for OpenTofu, and `validate` reports it as valid: adding the extension would run a pointless initialization in every variables folder and report a misleading success.
+
+      ## Module initialization
+
+      `tofu validate` can only run on an initialized directory: it needs the provider schemas and the installed child modules of the module it validates. MegaLinter therefore runs the following command once per analyzed directory, before validating it:
+
+      ```shell
+      tofu -chdir=<directory> init -backend=false -input=false -no-color
+      ```
+
+      `-backend=false` is what keeps this a linter: backend initialization is skipped entirely, so no state is read, no state lock is acquired and no cloud credentials are required. The linter works on reusable module repositories that declare no backend at all, and in CI jobs with no access to the infrastructure.
+
+      Initialization does need network access to resolve providers and remote module sources, and credentials when they come from a private registry. A module declaring neither provider nor external module is initialized offline.
+
+      Because initialization resolves dependencies, the analyzed repository has to be **self-contained**: a `module` block whose local `source` escapes the repository root, such as `../../modules/something`, can not be installed and is reported as `Unreadable module directory`. Vendor those modules, address them through a git or registry `source`, or skip the directories concerned with `TERRAFORM_TOFU_VALIDATE_FILTER_REGEX_EXCLUDE`.
+
+      ## Initialization arguments
+
+      Use **TERRAFORM_TOFU_VALIDATE_INIT_ARGUMENTS** to change the arguments sent to `tofu init`. Adding `-lockfile=readonly` turns an out-of-sync `.terraform.lock.hcl` into a reported error, instead of letting the initialization update it:
+
+      ```yaml
+      TERRAFORM_TOFU_VALIDATE_INIT_ARGUMENTS:
+        - "-backend=false"
+        - "-input=false"
+        - "-no-color"
+        - "-lockfile=readonly"
+      ```
+
+      Initialization writes a `.terraform` directory in every analyzed module directory, as any OpenTofu run does. Add `.terraform` to `EXCLUDED_DIRECTORIES` when your repository vendors modules there and you do not want their configuration validated as modules of their own.
+    name: TERRAFORM_TOFU_VALIDATE
+    linter_spdx_license: MPL-2.0
+    # OpenTofu specific extension, unknown to Terraform: leaves ".tf" free for
+    # a future terraform validate linter, as tofu fmt does for terraform fmt
+    file_extensions:
+      - ".tofu"
+    linter_url: https://opentofu.org/docs/cli/commands/validate/
+    linter_repo: https://github.com/opentofu/opentofu
+    linter_rules_url: https://opentofu.org/docs/cli/commands/validate/
+    linter_rules_inline_disable_url: https://opentofu.org/docs/language/expressions/custom-conditions/
+    linter_speed: 3
+    linter_icon_png_url: https://raw.githubusercontent.com/opentofu/brand-artifacts/main/full/transparent/PNG/on-light.png
+    linter_banner_image_url: https://raw.githubusercontent.com/opentofu/brand-artifacts/main/full/transparent/SVG/on-light.svg
+    cli_executable: tofu
+    # tofu validate works on a whole module: a single run validates each
+    # collected directory once, instead of once per file, so a module error is
+    # not repeated for every file of that module
+    cli_lint_mode: list_of_files
+    supported_cli_lint_modes:
+      - list_of_files
+    cli_lint_extra_args:
+      - "validate"
+      - "-no-color"
+    cli_lint_errors_count: regex_count
+    cli_lint_errors_regex: "Error: "
+    variables:
+      - name: TERRAFORM_TOFU_VALIDATE_INIT_ARGUMENTS
+        default_value: "-backend=false -input=false -no-color"
+        description: Arguments sent to **tofu init** before validating each directory. Keep `-backend=false` unless you really want MegaLinter to initialize your backend and access your state.
+    common_linter_errors:
+      - identifier: TERRAFORM_TOFU_VALIDATE_ERROR_PROVIDER_UNAVAILABLE
+        regex: "Failed to query available provider packages"
+        message: |-
+          OpenTofu could not resolve the providers declared in `required_providers`.
+          Check that the registry is reachable from the MegaLinter run, that the provider source addresses are correct, and that credentials are available when the provider comes from a private registry.
+      - identifier: TERRAFORM_TOFU_VALIDATE_ERROR_MODULE_NOT_INSTALLED
+        regex: "Module not installed"
+        message: |-
+          A child module declared in a `module` block could not be installed.
+          Verify that its `source` resolves (git reference, registry module name and version constraint) and that the MegaLinter run can reach it.
+      - identifier: TERRAFORM_TOFU_VALIDATE_ERROR_MODULE_DOWNLOAD_FAILED
+        regex: "Failed to download module"
+        message: |-
+          A `module` block points to a remote `source` that can not be cloned from inside the MegaLinter container, most often a private repository: an `ssh://git@` source fails with `Host key verification failed` because the container has neither your SSH key nor a `known_hosts` entry for the host.
+          Make the credentials reachable from inside the container, rewrite those sources to an HTTPS URL git can authenticate with a token, or skip the directories concerned with `TERRAFORM_TOFU_VALIDATE_FILTER_REGEX_EXCLUDE`.
+      - identifier: TERRAFORM_TOFU_VALIDATE_ERROR_UNREADABLE_MODULE_DIRECTORY
+        regex: "Unreadable module directory"
+        message: |-
+          A `module` block points to a local `source` directory that does not exist inside the analyzed workspace, usually a relative path escaping the repository root (`../../modules/...`).
+          Local module sources must be resolvable from the repository MegaLinter analyzes. Vendor the modules into the repository, use a git or registry `source`, or exclude those directories with `TERRAFORM_TOFU_VALIDATE_FILTER_REGEX_EXCLUDE`.
+      - identifier: TERRAFORM_TOFU_VALIDATE_ERROR_INCONSISTENT_LOCK_FILE
+        regex: "Inconsistent dependency lock file"
+        message: |-
+          The `.terraform.lock.hcl` of the module does not satisfy its `required_providers`, and `-lockfile=readonly` forbids updating it.
+          Run `tofu init -upgrade` locally and commit the refreshed lock file, or remove `-lockfile=readonly` from `TERRAFORM_TOFU_VALIDATE_INIT_ARGUMENTS`.
+    examples:
+      - "tofu -chdir=mymodule init -backend=false -input=false -no-color"
+      - "tofu -chdir=mymodule validate -no-color"
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=docker depName=ghcr.io/opentofu/opentofu
+          ARG TERRAFORM_TOFU_FMT_VERSION=1.12.6-minimal
+        - FROM ghcr.io/opentofu/opentofu:${TERRAFORM_TOFU_FMT_VERSION} AS opentofu
+        - COPY --link --from=opentofu /usr/local/bin/tofu /usr/bin/
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+    ide:
+      idea:
+        - name: Terraform and HCL
+          url: https://plugins.jetbrains.com/plugin/7808-terraform-and-hcl
+          id: org.intellij.plugins.hcl
+      vscode:
+        - name: OpenTofu
+          url: https://marketplace.visualstudio.com/items?itemName=OpenTofu.vscode-opentofu
+    test_folder: tofu_validate
+    version_extract_regex: "(?<=OpenTofu v)\\d+(\\.\\d+)+"

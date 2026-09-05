@@ -1,0 +1,152 @@
+---
+descriptor_id: CSS
+descriptor_type: format
+descriptor_flavors:
+  - all_flavors # Any project can contain CSS
+  - cupcake
+file_extensions:
+  - ".css"
+  - ".scss"
+  - ".saas"
+linters:
+  # StyleLint
+  - class: StyleLintLinter
+    linter_name: stylelint
+    linter_text: |
+      **Stylelint** is a mighty CSS linter that helps you avoid errors and enforce coding conventions in your stylesheets. It's designed to catch both syntax errors and problematic patterns while maintaining code consistency across projects.
+
+      **Key Features:**
+
+      - **Comprehensive Rule Set**: Over 100 built-in rules covering modern CSS syntax, features, and best practices
+      - **Multi-Language Support**: Handles CSS, SCSS, Sass, Less, SugarSS, and CSS-in-JS with embedded style extraction
+      - **Automatic Fixing**: Automatically repairs problems where possible, saving manual effort
+      - **Highly Extensible**: Plugin architecture allows custom rules and shareable configurations
+      - **Error Prevention**: Detects invalid syntax, problematic patterns, unknown properties, and malformed selectors
+      - **Convention Enforcement**: Enforces naming patterns, limits complexity, and maintains consistent code style
+      - **Robust Testing**: 15,000+ unit tests ensure reliability and accuracy
+      - **Industry Trusted**: Used by major companies like Google and GitHub for production codebases
+    name: CSS_STYLELINT
+    linter_spdx_license: MIT
+    linter_url: https://stylelint.io
+    linter_rules_url: https://stylelint.io/user-guide/rules/list
+    linter_repo: https://github.com/stylelint/stylelint
+    linter_banner_image_url: https://github.com/stylelint/stylelint/raw/main/identity/stylelint-icon-and-text-white.png
+    linter_rules_configuration_url: https://stylelint.io/user-guide/configure
+    linter_rules_inline_disable_url: https://stylelint.io/user-guide/ignore-code
+    # linter_megalinter_ref_url: https://stylelint.io/user-guide/integrations/other#analysis-platform-engines
+    cli_lint_mode: list_of_files
+    supported_cli_lint_modes:
+      - file
+      - list_of_files
+      - project
+    cli_lint_mode_project_exclude_arg_name: "--ignore-pattern"
+    config_file_name: .stylelintrc.json
+    cli_config_arg_name: "--config"
+    cli_lint_fix_arg_name: "--fix"
+    cli_lint_errors_count: regex_number
+    cli_lint_errors_regex: "([0-9]+) errors"
+    cli_lint_warnings_count: regex_number
+    cli_lint_warnings_regex: "([0-9]+) warnings"
+    common_linter_errors:
+      - identifier: CSS_STYLELINT_ERROR_PLUGIN_NOT_FOUND
+        regex: '(Could not find "?stylelint-|Cannot find module ''stylelint-|Could not load plugin)'
+        message: |-
+          stylelint could not load a plugin referenced in your `.stylelintrc.*` (e.g. `stylelint-order`, `stylelint-scss`, `stylelint-prettier`). The plugin is not installed in MegaLinter's bundled `node_modules` (`/node-deps/node_modules`).
+          Resolutions:
+            - Pre-install the missing plugin into MegaLinter's npm root via a pre-command in your .mega-linter.yml:
+                CSS_STYLELINT_PRE_COMMANDS:
+                  - command: "npm install stylelint-order"
+                    cwd: "root"
+                    continue_if_failed: false
+            - Note: `stylelint-scss` and `stylelint-config-sass-guidelines` are already bundled and do not need to be re-installed.
+            - Or install your project's dependencies and run stylelint from the workspace binary:
+                CSS_STYLELINT_PRE_COMMANDS:
+                  - command: yarn install --frozen-lockfile --ignore-scripts
+                    cwd: workspace
+                    continue_if_failed: false
+                CSS_STYLELINT_CLI_EXECUTABLE: node_modules/.bin/stylelint
+      - identifier: CSS_STYLELINT_ERROR_CONFIG_NOT_FOUND
+        regex: '(Could not find "?stylelint-config-|Cannot find module ''stylelint-config-|Could not (find|load) config|Failed to extend)'
+        message: |-
+          stylelint could not resolve a shareable config referenced via `extends` (e.g. `stylelint-config-recommended`, `stylelint-config-prettier`).
+          Resolutions:
+            - Pre-install the config package via a pre-command in your .mega-linter.yml:
+                CSS_STYLELINT_PRE_COMMANDS:
+                  - command: "npm install stylelint-config-recommended"
+                    cwd: "root"
+                    continue_if_failed: false
+            - Note: `stylelint-config-standard` and `stylelint-config-sass-guidelines` are already bundled.
+            - Verify the config name in `.stylelintrc.*` matches the published npm package name exactly.
+      - identifier: CSS_STYLELINT_ERROR_CUSTOM_SYNTAX_NOT_FOUND
+        regex: '(Cannot resolve custom syntax|Could not load "?customSyntax|Cannot find module ''postcss-)'
+        message: |-
+          stylelint could not load the `customSyntax` plugin referenced in your config (e.g. `postcss-scss`, `postcss-less`, `postcss-html`).
+          Resolutions:
+            - Pre-install the postcss syntax plugin via a pre-command in your .mega-linter.yml:
+                CSS_STYLELINT_PRE_COMMANDS:
+                  - command: "npm install postcss-scss postcss-html"
+                    cwd: "root"
+                    continue_if_failed: false
+            - For `.scss` files, stylelint v15+ auto-loads `postcss-scss` if `stylelint-scss` is present (bundled in MegaLinter); explicit `customSyntax` is usually unnecessary.
+      - identifier: CSS_STYLELINT_ERROR_NO_CONFIG
+        regex: '(No configuration provided|No "stylelint" configuration)'
+        message: |-
+          stylelint ran but no configuration was found. stylelint requires a config file (no built-in default rules).
+          Resolutions:
+            - Add a `.stylelintrc.json` (or `.stylelintrc.yml`, `stylelint.config.js`, or `stylelint` key in `package.json`) to your repository root, e.g.:
+                {
+                  "extends": "stylelint-config-standard"
+                }
+            - `stylelint-config-standard` is bundled in MegaLinter and can be used directly.
+    examples:
+      - "stylelint myfile.css"
+      - "stylelint --config .stylelintrc.json myfile.css myfile2.css myfile3.css"
+      - "stylelint --fix --config .stylelintrc.json myfile.css myfile2.css myfile3.css"
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=npm depName=stylelint
+          ARG NPM_STYLELINT_VERSION=17.14.1
+        - |-
+          # renovate: datasource=npm depName=stylelint-config-standard
+          ARG NPM_STYLELINT_CONFIG_STANDARD_VERSION=40.0.0
+        - |-
+          # renovate: datasource=npm depName=stylelint-config-sass-guidelines
+          ARG NPM_STYLELINT_CONFIG_SASS_GUIDELINES_VERSION=13.0.0
+        - |-
+          # renovate: datasource=npm depName=stylelint-scss
+          ARG NPM_STYLELINT_SCSS_VERSION=7.2.0
+      npm:
+        - stylelint@${NPM_STYLELINT_VERSION}
+        - stylelint-config-standard@${NPM_STYLELINT_CONFIG_STANDARD_VERSION}
+        - stylelint-config-sass-guidelines@${NPM_STYLELINT_CONFIG_SASS_GUIDELINES_VERSION}
+        - stylelint-scss@${NPM_STYLELINT_SCSS_VERSION}
+    supported_platforms:
+      platform:
+        - linux/amd64
+        - linux/arm64
+    ide:
+      emacs:
+        - name: flycheck
+          url: https://github.com/flycheck/flycheck
+      sublime:
+        - name: SublimeLinter-stylelint
+          url: https://github.com/SublimeLinter/SublimeLinter-stylelint
+        - name: SublimeLinter-contrib-stylelint_d
+          url: https://github.com/jo-sm/SublimeLinter-contrib-stylelint_d
+      vim:
+        - name: ale
+          url: https://github.com/dense-analysis/ale
+      vscode:
+        - name: vscode-stylelint
+          url: https://marketplace.visualstudio.com/items?itemName=stylelint.vscode-stylelint
+  # BIOME
+  - extends: biome
+    linter_name: biome
+    file_extensions:
+      - ".css"
+    test_folder: css_biome
+    examples:
+      - "biome check myfile.css"
+      - "biome check --config-path biome.json myfile.css"
+      - "biome check --write myfile.css"

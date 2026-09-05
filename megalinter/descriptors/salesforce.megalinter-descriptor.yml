@@ -1,0 +1,570 @@
+---
+descriptor_id: SALESFORCE
+descriptor_type: language
+descriptor_flavors:
+  - salesforce
+lint_all_files: true
+install:
+  # Java, because Apex is Java-based, so are related tools like PMD which is embedded in Salesforce Code Analyzer
+  apk:
+    - coreutils
+    - openjdk21
+  dockerfile:
+    - |-
+      # renovate: datasource=npm depName=@salesforce/cli
+      ARG NPM_SALESFORCE_CLI_VERSION=2.150.6
+    - |-
+      # renovate: datasource=npm depName=@salesforce/plugin-packaging
+      ARG NPM_SALESFORCE_PLUGIN_PACKAGING_VERSION=3.0.6
+    - |-
+      # renovate: datasource=npm depName=sfdx-hardis
+      ARG SFDX_HARDIS_VERSION=8.3.0
+    - ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+    - ENV PATH="$JAVA_HOME/bin:${PATH}"
+    - ENV XDG_DATA_HOME=/usr/local/share
+    - |-
+      RUN sf plugins install @salesforce/plugin-packaging@${NPM_SALESFORCE_PLUGIN_PACKAGING_VERSION} \
+          && echo y|sf plugins install sfdx-hardis@${SFDX_HARDIS_VERSION} \
+          && (npm cache clean --force || true) \
+          && rm -rf /root/.npm/_cacache
+    - ENV SF_AUTOUPDATE_DISABLE=true SF_CLI_DISABLE_AUTOUPDATE=true
+  # Salesforce DX
+  npm:
+    - "@salesforce/cli@${NPM_SALESFORCE_CLI_VERSION}"
+supported_platforms:
+  platform:
+    - linux/amd64
+    - linux/arm64
+  install_override:
+    - platform: linux/arm64
+      install:
+        dockerfile:
+          - ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk
+          - ENV PATH="$JAVA_HOME/bin:${PATH}"
+          - ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD true
+          - RUN echo y|sfdx plugins:install sfdx-hardis
+linters:
+  # Code Analyzer Apex
+  - class: SalesforceCodeAnalyzerLinter
+    linter_name: code-analyzer-apex
+    can_output_sarif: true
+    name: SALESFORCE_CODE_ANALYZER_APEX
+    files_sub_directory: force-app
+    linter_text: |
+      **Salesforce Code Analyzer (SFDX Scanner)** is the official Salesforce CLI plugin for scanning Apex code, triggers, and other Salesforce components to identify potential issues, security vulnerabilities, and code quality problems. It uses industry-standard tools like PMD and ESLint to provide comprehensive analysis of Salesforce development artifacts.
+
+      **Key Features:**
+
+      - **Multi-Engine Analysis**: Combines PMD for Apex analysis with ESLint for JavaScript/Lightning Web Components
+      - **Security Focus**: Identifies security vulnerabilities and potential attack vectors in Salesforce code
+      - **Performance Optimization**: Detects performance anti-patterns and inefficient code constructs
+      - **Code Quality Rules**: Comprehensive rule sets covering best practices, naming conventions, and maintainability
+      - **Configurable Severity**: Customizable severity thresholds and rule categories for different project needs
+      - **Multiple Output Formats**: Supports CSV, JSON, SARIF, and other formats for integration with development tools
+      - **Lightning Platform Specific**: Rules tailored for Salesforce platform constraints and governor limits
+      - **Custom Rule Sets**: Support for custom PMD rule sets and organization-specific coding standards
+
+      If your root folder is not **force-app**, please set variable `SALESFORCE_SFDX_SCANNER_DIRECTORY`
+
+      You can select categories and single rules by defining custom arguments (example: `SALESFORCE_SFDX_SCANNER_ARGUMENTS: -c "Best Practices,Security"`)
+
+      See more details in [Help](#help-content)
+
+      **Workaround: Restricted to PMD**
+    linter_url: https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/get-started.html
+    linter_repo: https://github.com/forcedotcom/code-analyzer
+    linter_rules_url: https://docs.pmd-code.org/latest/pmd_rules_apex.html
+    linter_rules_configuration_url: https://docs.pmd-code.org/latest/pmd_userdocs_making_rulesets.html
+    linter_rules_inline_disable_url: https://docs.pmd-code.org/latest/pmd_userdocs_suppressing_warnings.html
+    linter_spdx_license: BSD-3-Clause
+    config_file_name: code-analyzer.yml
+    cli_executable: sf
+    cli_config_arg_name: "--config-file"
+    cli_lint_extra_args:
+      - "code-analyzer"
+      - "run"
+      - "--rule-selector"
+      - "pmd:Recommended"
+      - "--workspace"
+      - .
+      - --severity-threshold
+      - "Moderate"
+      - "--output-file"
+      - "{{REPORT_FOLDER}}/code-analyzer-report-apex.csv"
+      - "--view"
+      - "table"
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - project
+    cli_help_extra_args:
+      - "code-analyzer"
+      - "run"
+    cli_help_extra_commands:
+      - "sf code-analyzer rules"
+    cli_version_extra_args:
+      - "plugins"
+    cli_version_arg_name: ""
+    version_extract_regex: "(?<=code-analyzer )\\d+(\\.\\d+)+"
+    cli_lint_errors_count: regex_number
+    cli_lint_errors_regex: "Found ([0-9]+) violation\\(s\\)"
+    common_linter_errors:
+      - identifier: SALESFORCE_CODE_ANALYZER_APEX_ERROR_CONFIG_INVALID
+        regex: "(Failed to parse the configuration content|The specified configuration file .* does not exist|The specified configuration file .* has an unsupported file extension|The configuration content is invalid)"
+        message: |-
+          code-analyzer could not load the configuration file (code-analyzer.yml).
+          Verify the file is valid v5 YAML and that its path is reachable from the workspace.
+          Generate a starter config with: sf code-analyzer config -f code-analyzer.yml
+    examples:
+      - "sf code-analyzer run --rule-selector pmd:Recommended --workspace . --output-file results.csv"
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=npm depName=@salesforce/plugin-code-analyzer
+          ARG SALESFORCE_CODE_ANALYZER_VERSION=5.16.0
+        - |-
+          RUN sf plugins install code-analyzer@${SALESFORCE_CODE_ANALYZER_VERSION} \
+              && (npm cache clean --force || true) \
+              && rm -rf /root/.npm/_cacache
+    supported_platforms:
+      platform:
+        - linux/amd64
+        # Errors when building the image
+        #- linux/arm64
+    ide:
+      eclipse:
+        - name: pmd-eclipse-plugin
+          url: https://github.com/pmd/pmd-eclipse-plugin
+      emacs:
+        - name: pmd-emacs
+          url: https://github.com/pmd/pmd-emacs/
+      idea:
+        - name: PMD IntelliJ
+          url: https://plugins.jetbrains.com/plugin/1137-pmdplugin
+          id: PMDPlugin
+      vscode:
+        - name: Salesforce Extension Pack
+          url: https://marketplace.visualstudio.com/items?itemName=salesforce.salesforcedx-vscode
+
+  # Code Analyzer ApexGuru
+  - class: SalesforceCodeAnalyzerApexGuruLinter
+    linter_name: code-analyzer-apexguru
+    can_output_sarif: true
+    name: SALESFORCE_CODE_ANALYZER_APEXGURU
+    files_sub_directory: force-app
+    activation_rules:
+      - type: variable_is_set
+        variable: SFDX_AUTH_URL
+    linter_text: |
+      **ApexGuru** is the AI-driven engine of Salesforce Code Analyzer. Unlike the other engines, it does not analyze your sources locally: it sends your Apex classes and triggers to a connected Salesforce org, where an LLM combined with Java Virtual Machine runtime traces detects SOQL inefficiencies, critical anti-patterns and scalability hotspots that static analysis alone can not see.
+
+      **Key Features:**
+
+      - **Runtime-Aware Analysis**: Correlates your Apex sources with JVM traces collected in the org to surface issues that only appear at execution time
+      - **Performance & Scalability**: Detects SOQL inefficiencies, expensive schema describe calls and governor-limit hotspots
+      - **Actionable Recommendations**: Reports exact line-level highlights, severity ratings and suggested code changes (`--include-suggestions`)
+      - **Unified Toolchain**: Runs via the same Salesforce Code Analyzer v5 plugin and `code-analyzer.yml` configuration as the Apex, Aura, Flow and LWC engines
+      - **Multiple Output Formats**: Supports CSV, JSON, HTML, XML and SARIF output
+
+      **Requirements**
+
+      ApexGuru only analyzes `.cls` and `.trigger` files, and it requires a connected org where ApexGuru is enabled. It is available at no extra charge for Unlimited Edition production orgs, full copy sandboxes, Signature orgs and Scale Test customers, and requires Scale Center to be enabled. See [Activate and Use ApexGuru](https://help.salesforce.com/s/articleView?id=xcloud.apexguru_workflow.htm&type=5).
+
+      **Activation**
+
+      Because it needs an authenticated org, this linter is **inactive by default**: it activates only when the `SFDX_AUTH_URL` variable is defined. Store the [Salesforce DX auth url](https://developer.salesforce.com/docs/platform/salesforce-cli-reference/guide/cli_reference_org_display.html) of the target org in a **CI secret** named `SFDX_AUTH_URL`, and MegaLinter logs in to that org before running ApexGuru.
+
+      The scan is then explicitly sent to that org with `--target-org`, so the `.sfdx/sfdx-config.json` present at the root of most Salesforce repositories, which usually points to a long gone scratch org, can not hijack it.
+
+      **Configuration**
+
+      Engine settings (`target_org`, `api_timeout_ms`, `api_initial_retry_ms`, `api_max_retry_ms`, `api_backoff_multiplier`) go under `engines.apexguru` in your `code-analyzer.yml`.
+
+      If your root folder is not **force-app**, please set variable `SALESFORCE_CODE_ANALYZER_APEXGURU_DIRECTORY`
+
+      See more details in [Help](#help-content)
+    linter_url: https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/engine-apexguru.html
+    linter_repo: https://github.com/forcedotcom/code-analyzer
+    linter_rules_url: https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/engine-apexguru.html
+    linter_rules_configuration_url: https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/config.html
+    linter_spdx_license: BSD-3-Clause
+    # Remote analysis in the connected org, polled until it completes
+    # (5 minutes default timeout): by far the slowest Code Analyzer engine
+    linter_speed: 1
+    config_file_name: code-analyzer.yml
+    cli_executable: sf
+    cli_config_arg_name: "--config-file"
+    cli_lint_extra_args:
+      - "code-analyzer"
+      - "run"
+      - "--rule-selector"
+      - "apexguru"
+      - "--workspace"
+      - "."
+      - "--include-suggestions"
+      - "--severity-threshold"
+      - "Moderate"
+      - "--output-file"
+      - "{{REPORT_FOLDER}}/code-analyzer-report-apexguru.csv"
+      - "--view"
+      - "table"
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - project
+    cli_help_extra_args:
+      - "code-analyzer"
+      - "run"
+    cli_version_extra_args:
+      - "plugins"
+    cli_version_arg_name: ""
+    version_extract_regex: "(?<=code-analyzer )\\d+(\\.\\d+)+"
+    cli_lint_errors_count: regex_number
+    cli_lint_errors_regex: "Found ([0-9]+) violation\\(s\\)"
+    common_linter_errors:
+      - identifier: SALESFORCE_CODE_ANALYZER_APEXGURU_ERROR_CONFIG_INVALID
+        regex: "(Failed to parse the configuration content|The specified configuration file .* does not exist|The specified configuration file .* has an unsupported file extension|The configuration content is invalid)"
+        message: |-
+          code-analyzer could not load the configuration file (code-analyzer.yml).
+          Verify the file is valid v5 YAML and that its path is reachable from the workspace.
+          Generate a starter config with: sf code-analyzer config -f code-analyzer.yml
+      - identifier: SALESFORCE_CODE_ANALYZER_APEXGURU_ERROR_NO_ORG
+        regex: "(No authorization information found for|No default (environment|org) found|NoDefaultEnvError|Unable to (find|resolve) the target org|The org .* is not authenticated)"
+        message: |-
+          ApexGuru needs an authenticated Salesforce org and could not resolve one.
+          Verify that the SFDX_AUTH_URL variable holds a valid Salesforce DX auth url, obtained with: sf org display --target-org <alias> --verbose --json
+          The auth url must not be expired: revoked or rotated refresh tokens make the login fail before the scan starts.
+      - identifier: SALESFORCE_CODE_ANALYZER_APEXGURU_ERROR_ENGINE_SKIPPED
+        regex: "ApexGuru skipped: "
+        message: |-
+          The ApexGuru engine did not analyze anything: it skipped itself and reported no violation.
+          The reason is printed right after `ApexGuru skipped:` in the linter output above.
+          MegaLinter turns this into an error on purpose, so that a run analyzing nothing is not reported as a success.
+      - identifier: SALESFORCE_CODE_ANALYZER_APEXGURU_ERROR_NOT_ENABLED
+        regex: "(ApexGuru is (not|un)available|ApexGuru .* not enabled|not entitled to use ApexGuru|Scale Center .* not enabled)"
+        message: |-
+          ApexGuru is not enabled on the connected org.
+          It requires Scale Center and is available for Unlimited Edition production orgs, full copy sandboxes, Signature orgs and Scale Test customers.
+          Enable it by following https://help.salesforce.com/s/articleView?id=xcloud.apexguru_workflow.htm&type=5 , or disable this linter with DISABLE_LINTERS: [SALESFORCE_CODE_ANALYZER_APEXGURU]
+      - identifier: SALESFORCE_CODE_ANALYZER_APEXGURU_ERROR_TIMEOUT
+        regex: "(ApexGuru .* timed out|timed out after .* milliseconds|api_timeout_ms)"
+        message: |-
+          The ApexGuru analysis did not complete before the engine timeout (5 minutes by default).
+          Raise the `api_timeout_ms` setting of the apexguru engine in your code-analyzer.yml, or reduce the analyzed scope with FILTER_REGEX_EXCLUDE.
+    examples:
+      - "sf code-analyzer run --rule-selector apexguru --workspace . --include-suggestions --output-file results.csv"
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=npm depName=@salesforce/plugin-code-analyzer
+          ARG SALESFORCE_CODE_ANALYZER_VERSION=5.16.0
+        - |-
+          RUN sf plugins install code-analyzer@${SALESFORCE_CODE_ANALYZER_VERSION} \
+              && (npm cache clean --force || true) \
+              && rm -rf /root/.npm/_cacache
+    supported_platforms:
+      platform:
+        - linux/amd64
+        # Errors when building the image
+        #- linux/arm64
+    ide:
+      vscode:
+        - name: Salesforce Code Analyzer
+          url: https://marketplace.visualstudio.com/items?itemName=salesforce.sfdx-code-analyzer-vscode
+        - name: Salesforce Extension Pack
+          url: https://marketplace.visualstudio.com/items?itemName=salesforce.salesforcedx-vscode
+
+  # Code Analyzer Aura
+  - class: SalesforceCodeAnalyzerLinter
+    linter_name: code-analyzer-aura
+    can_output_sarif: true
+    name: SALESFORCE_CODE_ANALYZER_AURA
+    files_sub_directory: force-app
+    linter_text: |
+      **Salesforce Code Analyzer for Aura Components** is a specialized linting tool that focuses on Aura Lightning components, using ESLint with Salesforce-specific rules to ensure Aura components follow best practices and platform guidelines.
+
+      **Key Features:**
+
+      - **Aura-Specific Rules**: Specialized ESLint rules designed for Aura Lightning component development patterns
+      - **JavaScript Analysis**: Comprehensive JavaScript linting for Aura component controllers, helpers, and renderers
+      - **Security Validation**: Identifies security vulnerabilities specific to Aura component architecture
+      - **Platform Compliance**: Ensures components follow Salesforce Lightning platform requirements and constraints
+      - **Event Handling**: Validates proper event handling patterns and component communication
+      - **Performance Optimization**: Detects inefficient patterns that could impact component performance
+      - **API Usage Validation**: Ensures proper use of Aura framework APIs and deprecated method detection
+      - **Configurable Rules**: Customizable ESLint configuration for organization-specific coding standards
+      - **Integration Ready**: Seamless integration with Salesforce development workflows and CI/CD pipelines
+
+      If your root folder is not **force-app**, please set variable `SALESFORCE_SFDX_SCANNER_AURA_DIRECTORY`
+
+      You can select categories and single rules by defining custom arguments (example: `SALESFORCE_SFDX_SCANNER_ARGUMENTS: -c "Best Practices,Security"`)
+
+      See more details in [Help](#help-content)
+
+      **Workaround: Restricted to Aura**
+    linter_url: https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/get-started.html
+    linter_repo: https://github.com/forcedotcom/code-analyzer
+    linter_rules_url: https://github.com/forcedotcom/eslint-plugin-aura#rules
+    linter_rules_configuration_url: https://eslint.org/docs/latest/use/configure
+    linter_rules_inline_disable_url: https://eslint.org/docs/latest/use/configure/rules#disabling-rules
+    linter_spdx_license: BSD-3-Clause
+    config_file_name: code-analyzer.yml
+    cli_executable: sf
+    cli_config_arg_name: "--config-file"
+    cli_lint_extra_args:
+      - "code-analyzer"
+      - "run"
+      - "--rule-selector"
+      - "eslint"
+      - "--workspace"
+      - .
+      - "--target"
+      - "**/aura/**/*.js"
+      - "--severity-threshold"
+      - "Moderate"
+      - "--output-file"
+      - "{{REPORT_FOLDER}}/code-analyzer-report-aura.csv"
+      - "--view"
+      - "table"
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - project
+    cli_help_extra_args:
+      - "code-analyzer"
+      - "run"
+    cli_help_extra_commands:
+      - "sf code-analyzer rules --rule-selector eslint"
+    cli_version_extra_args:
+      - "plugins"
+    cli_version_arg_name: ""
+    version_extract_regex: "(?<=code-analyzer )\\d+(\\.\\d+)+"
+    cli_lint_errors_count: regex_number
+    cli_lint_errors_regex: "Found ([0-9]+) violation\\(s\\)"
+    common_linter_errors:
+      - identifier: SALESFORCE_CODE_ANALYZER_AURA_ERROR_CONFIG_INVALID
+        regex: "(Failed to parse the configuration content|The specified configuration file .* does not exist|The specified configuration file .* has an unsupported file extension|The configuration content is invalid)"
+        message: |-
+          code-analyzer could not load the configuration file (code-analyzer.yml).
+          Verify the file is valid v5 YAML and that its path is reachable from the workspace.
+          Generate a starter config with: sf code-analyzer config -f code-analyzer.yml
+      - identifier: SALESFORCE_CODE_ANALYZER_AURA_ERROR_NO_TARGET_FILES
+        regex: "(At least one file or folder must be included in the workspace|The specified target .* does not exist underneath any of the specified workspace paths|The file or folder .* does not exist)"
+        message: |-
+          code-analyzer could not find any Aura JavaScript files matching `**/aura/**/*.js`.
+          Verify that your Aura components live under the workspace (default `force-app`) and that `SALESFORCE_CODE_ANALYZER_AURA_DIRECTORY` points to the correct root.
+    examples:
+      - "sf code-analyzer run --rule-selector eslint --workspace . --file-glob '**/aura/**/*.js' --output-file results.csv"
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=npm depName=@salesforce/plugin-code-analyzer
+          ARG SALESFORCE_CODE_ANALYZER_VERSION=5.16.0
+        - |-
+          RUN sf plugins install code-analyzer@${SALESFORCE_CODE_ANALYZER_VERSION} \
+              && (npm cache clean --force || true) \
+              && rm -rf /root/.npm/_cacache
+    supported_platforms:
+      platform:
+        - linux/amd64
+        # Errors when building the image
+        #- linux/arm64
+    ide:
+      vscode:
+        - name: Salesforce Extension Pack
+          url: https://marketplace.visualstudio.com/items?itemName=salesforce.salesforcedx-vscode
+
+  # Code Analyzer LWC
+  - class: SalesforceCodeAnalyzerLinter
+    linter_name: code-analyzer-lwc
+    can_output_sarif: true
+    name: SALESFORCE_CODE_ANALYZER_LWC
+    files_sub_directory: force-app
+    linter_text: |
+      **Salesforce Code Analyzer for Lightning Web Components** is a specialized linting tool that focuses on Lightning Web Components (LWC), using ESLint with LWC-specific rules to ensure components follow modern web standards and Salesforce platform best practices.
+
+      **Key Features:**
+
+      - **LWC-Specific Rules**: Comprehensive ESLint rules designed specifically for Lightning Web Component development patterns
+      - **Modern JavaScript Analysis**: Validates modern JavaScript/ES6+ usage within the LWC framework constraints
+      - **Security Validation**: Identifies security vulnerabilities and potential XSS issues in LWC components
+      - **Performance Optimization**: Detects performance anti-patterns and inefficient rendering patterns
+      - **Lightning Platform Integration**: Ensures proper use of Lightning platform APIs and decorators (@api, @track, @wire)
+      - **Component Lifecycle**: Validates correct component lifecycle method usage and patterns
+      - **Wire Service Validation**: Ensures proper use of @wire decorators and Lightning Data Service
+      - **Event Handling**: Validates custom event creation and handling patterns
+      - **Template Validation**: Analyzes HTML templates for proper binding and directive usage
+      - **Accessibility Compliance**: Built-in accessibility checks for inclusive Lightning component design
+
+      If your root folder is not **force-app**, please set variable `SALESFORCE_SFDX_SCANNER_LWC_DIRECTORY`
+
+      You can select categories and single rules by defining custom arguments (example: `SALESFORCE_SFDX_SCANNER_ARGUMENTS: -c "Best Practices,Security"`)
+
+      See more details in [Help](#help-content)
+
+      **Workaround: Restricted to LWC**
+    linter_url: https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/get-started.html
+    linter_repo: https://github.com/forcedotcom/code-analyzer
+    linter_rules_url: https://github.com/salesforce/eslint-plugin-lwc#rules
+    linter_rules_configuration_url: https://eslint.org/docs/latest/use/configure
+    linter_rules_inline_disable_url: https://eslint.org/docs/latest/use/configure/rules#disabling-rules
+    linter_spdx_license: BSD-3-Clause
+    config_file_name: code-analyzer.yml
+    cli_executable: sf
+    cli_config_arg_name: "--config-file"
+    cli_lint_extra_args:
+      - "code-analyzer"
+      - "run"
+      - "--rule-selector"
+      - "eslint:LWC"
+      - "--workspace"
+      - .
+      - "--target"
+      - "**/lwc/**/*.js"
+      - "--severity-threshold"
+      - "Moderate"
+      - "--output-file"
+      - "{{REPORT_FOLDER}}/code-analyzer-report-lwc.csv"
+      - "--view"
+      - "table"
+    cli_lint_mode: project
+    supported_cli_lint_modes:
+      - project
+    cli_help_extra_args:
+      - "code-analyzer"
+      - "run"
+    cli_help_extra_commands:
+      - "sf code-analyzer rules --rule-selector eslint:LWC"
+    cli_version_extra_args:
+      - "plugins"
+    cli_version_arg_name: ""
+    version_extract_regex: "(?<=code-analyzer )\\d+(\\.\\d+)+"
+    cli_lint_errors_count: regex_number
+    cli_lint_errors_regex: "Found ([0-9]+) violation\\(s\\)"
+    common_linter_errors:
+      - identifier: SALESFORCE_CODE_ANALYZER_LWC_ERROR_CONFIG_INVALID
+        regex: "(Failed to parse the configuration content|The specified configuration file .* does not exist|The specified configuration file .* has an unsupported file extension|The configuration content is invalid)"
+        message: |-
+          code-analyzer could not load the configuration file (code-analyzer.yml).
+          Verify the file is valid v5 YAML and that its path is reachable from the workspace.
+          Generate a starter config with: sf code-analyzer config -f code-analyzer.yml
+      - identifier: SALESFORCE_CODE_ANALYZER_LWC_ERROR_NO_TARGET_FILES
+        regex: "(At least one file or folder must be included in the workspace|The specified target .* does not exist underneath any of the specified workspace paths|The file or folder .* does not exist)"
+        message: |-
+          code-analyzer could not find any LWC JavaScript files matching `**/lwc/**/*.js`.
+          Verify that your Lightning Web Components live under the workspace (default `force-app`) and that `SALESFORCE_CODE_ANALYZER_LWC_DIRECTORY` points to the correct root.
+    examples:
+      - "sf code-analyzer run --rule-selector eslint:LWC --workspace . --target '**/lwc/**/*.js' --output-file report.csv"
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=npm depName=@salesforce/plugin-code-analyzer
+          ARG SALESFORCE_CODE_ANALYZER_VERSION=5.16.0
+        - |-
+          RUN sf plugins install code-analyzer@${SALESFORCE_CODE_ANALYZER_VERSION} \
+              && (npm cache clean --force || true) \
+              && rm -rf /root/.npm/_cacache
+    supported_platforms:
+      platform:
+        - linux/amd64
+        # Errors when building the image
+        #- linux/arm64
+    ide:
+      vscode:
+        - name: Salesforce Extension Pack
+          url: https://marketplace.visualstudio.com/items?itemName=salesforce.salesforcedx-vscode
+
+  # Code Analyzer Flow
+  - class: SalesforceCodeAnalyzerLinter
+    linter_name: code-analyzer-flow
+    can_output_sarif: true
+    name: SALESFORCE_CODE_ANALYZER_FLOW
+    files_sub_directory: force-app
+    linter_text: |
+      **Salesforce Code Analyzer for Flows (Flow Scanner engine)** audits Salesforce Flows and reports detailed information about security issues. It is the Flow Scanner engine bundled with Salesforce Code Analyzer v5, run through the unified `sf code-analyzer run` command.
+
+      **Key Features:**
+
+      - **Flow Security Analysis**: Audits `.flow-meta.xml` Flows for security vulnerabilities such as unsafe data exposure and missing sanitization
+      - **Subflow Resolution**: Analyzes the full workspace to resolve subflows while targeting the Flows you want reported
+      - **Data-Flow Aware**: Traces how data moves through Flow elements to surface risky patterns
+      - **Unified Toolchain**: Runs via the same Salesforce Code Analyzer v5 plugin and `code-analyzer.yml` configuration as the Apex, Aura, and LWC engines
+      - **Configurable Severity**: Customizable severity thresholds to match your project's quality bar
+      - **Multiple Output Formats**: Supports CSV, JSON, HTML, and SARIF output for integration with development tools
+      - **CI/CD Integration**: Seamless integration with Salesforce development pipelines
+
+      The Flow Scanner engine requires Python 3.10 or later, which is available in the MegaLinter Salesforce image. If Python can't be resolved automatically, set the `python_command` setting in your `code-analyzer.yml`.
+
+      If your root folder is not **force-app**, please set variable `SALESFORCE_CODE_ANALYZER_FLOW_DIRECTORY`
+
+      See more details in [Help](#help-content)
+    linter_url: https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/engine-flow.html
+    linter_repo: https://github.com/forcedotcom/code-analyzer
+    linter_rules_url: https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/rules-flow.html
+    linter_rules_configuration_url: https://developer.salesforce.com/docs/platform/salesforce-code-analyzer/guide/config.html
+    linter_spdx_license: BSD-3-Clause
+    config_file_name: code-analyzer-flow.yml
+    cli_executable: sf
+    cli_config_arg_name: "--config-file"
+    cli_lint_extra_args:
+      - "code-analyzer"
+      - "run"
+      - "--rule-selector"
+      - "flow"
+      - "--workspace"
+      - "."
+      - "--target"
+      - "**/*.flow-meta.xml"
+      - "--severity-threshold"
+      - "Moderate"
+      - "--output-file"
+      - "{{REPORT_FOLDER}}/code-analyzer-report-flow.csv"
+      - "--view"
+      - "table"
+    cli_lint_mode: project
+    cli_help_extra_args:
+      - "code-analyzer"
+      - "run"
+    cli_help_extra_commands:
+      - "sf code-analyzer rules --rule-selector flow"
+    cli_version_extra_args:
+      - "plugins"
+    cli_version_arg_name: ""
+    version_extract_regex: "(?<=code-analyzer )\\d+(\\.\\d+)+"
+    cli_lint_errors_count: regex_number
+    cli_lint_errors_regex: "Found ([0-9]+) violation\\(s\\)"
+    common_linter_errors:
+      - identifier: SALESFORCE_CODE_ANALYZER_FLOW_ERROR_CONFIG_INVALID
+        regex: "(Failed to parse the configuration content|The specified configuration file .* does not exist|The specified configuration file .* has an unsupported file extension|The configuration content is invalid)"
+        message: |-
+          code-analyzer could not load the configuration file (code-analyzer.yml).
+          Verify the file is valid v5 YAML and that its path is reachable from the workspace.
+          Generate a starter config with: sf code-analyzer config -f code-analyzer.yml
+      - identifier: SALESFORCE_CODE_ANALYZER_FLOW_ERROR_NO_TARGET_FILES
+        regex: "(At least one file or folder must be included in the workspace|The specified target .* does not exist underneath any of the specified workspace paths|The file or folder .* does not exist)"
+        message: |-
+          code-analyzer could not find any Flow files matching `**/*.flow-meta.xml`.
+          Verify that your Flows live under the workspace (default `force-app`) and that `SALESFORCE_CODE_ANALYZER_FLOW_DIRECTORY` points to the correct root.
+      - identifier: SALESFORCE_CODE_ANALYZER_FLOW_ERROR_PYTHON_MISSING
+        regex: "(Python .*(is )?missing|Could not (find|locate|discover) .*[Pp]ython|No .*[Pp]ython .* found|python_command)"
+        message: |-
+          The Flow Scanner engine requires Python 3.10 or later and could not resolve a Python interpreter.
+          Verify Python 3.10+ is installed, or set the `python_command` setting for the flow engine in your `code-analyzer.yml`.
+    examples:
+      - "sf code-analyzer run --rule-selector flow --workspace . --output-file results.csv"
+    install:
+      dockerfile:
+        - |-
+          # renovate: datasource=npm depName=@salesforce/plugin-code-analyzer
+          ARG SALESFORCE_CODE_ANALYZER_VERSION=5.16.0
+        - |-
+          RUN sf plugins install code-analyzer@${SALESFORCE_CODE_ANALYZER_VERSION} \
+              && (npm cache clean --force || true) \
+              && rm -rf /root/.npm/_cacache
+    test_folder: salesforce-lfs
+    supported_platforms:
+      platform:
+        - linux/amd64
+        # Errors when building the image
+        #- linux/arm64
+    ide:
+      vscode:
+        - name: Salesforce Extension Pack
+          url: https://marketplace.visualstudio.com/items?itemName=salesforce.salesforcedx-vscode
