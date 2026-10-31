@@ -1,0 +1,16 @@
+---
+# Minimal MegaLinter config for harness tests (avoids the repo's own heavy config)
+APPLY_FIXES: none
+VALIDATE_ALL_CODEBASE: true
+PRINT_ALL_FILES: true
+FLAVOR_SUGGESTIONS: false
+EMAIL_REPORTER: false
+FILEIO_REPORTER: false
+API_REPORTER: false
+GITHUB_COMMENT_REPORTER: false
+GITHUB_STATUS_REPORTER: false
+GITLAB_COMMENT_REPORTER: false
+UPDATED_SOURCES_REPORTER: false
+JSON_REPORTER: true
+TEXT_REPORTER: true
+SARIF_REPORTER: false

@@ -1,0 +1,32 @@
+name: Test MegaLinter DISABLE_ERRORS on invalid JSON
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        env:
+          MEGALINTER_CONFIG: tests/fixtures/megalinter/test.mega-linter.yml
+          ENABLE_LINTERS: JSON_JSONLINT
+          FILTER_REGEX_INCLUDE: 'tests/fixtures/megalinter/invalid/'
+          VALIDATE_ALL_CODEBASE: "true"
+          APPLY_FIXES: none
+          DISABLE_ERRORS: "true"
+          REPORT_OUTPUT_FOLDER: megalinter-reports-noerr
+      - name: Assert step succeeded despite lint errors
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success with DISABLE_ERRORS=true"
+            exit 1
+          fi
+          if [ ! -d "$GITHUB_WORKSPACE/megalinter-reports-noerr" ]; then
+            echo "FAIL: report folder not created"
+            exit 1
+          fi
+          echo "PASS"

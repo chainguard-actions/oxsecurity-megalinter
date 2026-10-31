@@ -1,0 +1,13 @@
+Basic auth:
+
+https://the-internet.herokuapp.com/basic_auth
+
+Private key:
+
+This fixture deliberately carries no secret material. The success test must
+produce zero findings offline: it used to hold the same private key and a
+basic-auth URL as the bad fixtures, and only differed by the credential
+failing to authenticate, which made the whole test depend on a third-party
+endpoint staying reachable from the CI runner.
+
+See the bad fixtures for the detected counterparts.

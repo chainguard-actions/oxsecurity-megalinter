@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""
+Use PHP CS Fixer to check PHP code formatting
+"""
+
+from megalinter import Linter
+
+
+def _php_single_quoted(value):
+    return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
+class PhpCsFixerLinter(Linter):
+    # Forward excluded directories through a generated PHP config requiring
+    # the resolved one and chaining Finder exclusions. Only applied when a
+    # config is passed: php-cs-fixer configs are code, so there is no
+    # resolved file to extend otherwise
+    def manage_excluded_directories_config(self, cmd):
+        config_index = self.find_cli_argument_value_index(cmd, ("--config",))
+        if config_index is None:
+            return cmd
+        included_config = cmd[config_index].replace("\\", "/")
+        exclude_dirs = ", ".join(
+            _php_single_quoted(excluded_dir)
+            for excluded_dir in self.get_project_exclude_directories()
+        )
+        generated_config = self.write_report_generated_file(
+            "php-cs-fixer-config.php",
+            [
+                "<?php",
+                "",
+                f"$config = require {_php_single_quoted(included_config)};",
+                # setFinder() also accepts plain iterables, which have no exclude()
+                "$finder = $config->getFinder();",
+                "if ($finder instanceof \\Symfony\\Component\\Finder\\Finder) {",
+                f"    $finder->exclude([{exclude_dirs}]);",
+                "}",
+                "return $config;",
+            ],
+        )
+        cmd[config_index] = generated_config
+        self.log_project_exclude_forwarding(
+            f"Generated {generated_config} chaining {included_config} with "
+            f"EXCLUDED_DIRECTORIES as Finder exclusions "
+            f"(disable with {self.name}_FORWARD_EXCLUDED_DIRECTORIES: false)"
+        )
+        return cmd

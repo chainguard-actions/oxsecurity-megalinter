@@ -1,0 +1,84 @@
+# osv-scanner ignore list
+# Format reference: https://google.github.io/osv-scanner/configuration/
+
+# brace-expansion 2.1.2 (mega-linter-runner/yarn.lock) — GHSA-mh99-v99m-4gvg,
+# unbounded expansion length DoS. The advisory declares a single affected range
+# (>=0 <5.0.8), so every 1.x and 2.x release is flagged even though the fix only
+# ever shipped in the 5.x line. There is no 2.x backport: 2.1.2 is the newest 2.x.
+#
+# Not exploitable here. This copy is reached only through minimatch@9, pulled in
+# by mocha (a devDependency, never published — package.json "files" ships lib and
+# generators only) and by @yeoman/transform. Both expand glob patterns that come
+# from our own code and from the user's local paths, never from an attacker, in a
+# one-shot CLI rather than a long-running service. The 5.x copy used by
+# minimatch@10 is already on the fixed 5.0.8.
+#
+# Scoped to the exact vulnerable version so a 5.x regression, or any other
+# advisory against this package, still fails the scan.
+# Remove when a patched 2.x ships, or when mocha and @yeoman/transform move to
+# minimatch@10.
+[[PackageOverrides]]
+name = "brace-expansion"
+version = "2.1.2"
+ecosystem = "npm"
+vulnerability.ignore = true
+reason = "DoS via crafted brace pattern; only reachable via minimatch@9 (mocha devDependency and @yeoman/transform) expanding trusted globs in a one-shot CLI. No 2.x backport exists."
+
+# braces 3.0.3 (mega-linter-runner/yarn.lock) — GHSA-vfj7-8cjw-p6xm, stack-exhaustion DoS through
+# deeply nested brace patterns. Reached only through micromatch (fast-glob, globby),
+# expanding glob patterns that come from our own code and from the user's local
+# paths, never from an attacker, in a one-shot CLI. 3.0.3 is the latest release and
+# the advisory has no fixed version.
+# Scoped to the exact vulnerable version. Remove when a patched braces ships.
+[[PackageOverrides]]
+name = "braces"
+version = "3.0.3"
+ecosystem = "npm"
+vulnerability.ignore = true
+reason = "DoS via deeply nested brace pattern; only reachable via micromatch expanding trusted globs in a one-shot CLI. No fixed version exists."
+
+# http-cache-semantics 4.2.0 (mega-linter-runner/yarn.lock) — GHSA-ch52-4w7c-c8xp, cross-user response
+# disclosure from a SHARED cache through the max-stale directive. Reached only
+# through make-fetch-happen (npm-registry-fetch, sigstore, tuf-js), whose cache is
+# the local npm cache of the single user running the CLI: there is no shared cache.
+# 4.2.0 is the latest release and the advisory has no fixed version.
+# Scoped to the exact vulnerable version. Remove when a patched release ships.
+[[PackageOverrides]]
+name = "http-cache-semantics"
+version = "4.2.0"
+ecosystem = "npm"
+vulnerability.ignore = true
+reason = "Shared-cache cross-user disclosure; only reachable via make-fetch-happen with the private local npm cache of a one-shot CLI. No fixed version exists."
+
+# minimatch 10.2.6 and 9.0.9 (mega-linter-runner/yarn.lock) — GHSA-g3hv-75wg-m249,
+# DoS through globparts amplification of a crafted pattern. The fix only ships in
+# minimatch 11, outside the ^9 / ^10 ranges of every parent (eslint, @npmcli/*,
+# @yeoman/*, glob 13). Not exploitable here: the patterns come from our own code
+# and from the user's local paths, never from an attacker, in a one-shot CLI.
+# Remove when the parents move to minimatch@11.
+[[PackageOverrides]]
+name = "minimatch"
+version = "10.2.6"
+ecosystem = "npm"
+vulnerability.ignore = true
+reason = "DoS via crafted glob pattern; patterns are trusted in a one-shot CLI. Fix only in minimatch 11, outside the parents' ^10 range."
+
+[[PackageOverrides]]
+name = "minimatch"
+version = "9.0.9"
+ecosystem = "npm"
+vulnerability.ignore = true
+reason = "DoS via crafted glob pattern; patterns are trusted in a one-shot CLI. Fix only in minimatch 11, outside @yeoman/transform's ^9 range."
+
+# glob 13.0.6 (mega-linter-runner/yarn.lock) — GHSA-3g3m-2fjr-6pw4, a walk keeps
+# reading the file system after its AbortSignal fired. Not exploitable here: no
+# caller relies on cancellation as a security boundary (mega-linter-runner passes
+# no signal), and the walked paths are the user's own local files. The fix only
+# ships in glob 14, outside the ^13 range of @npmcli/* and cacache.
+# Remove when the parents move to glob@14.
+[[PackageOverrides]]
+name = "glob"
+version = "13.0.6"
+ecosystem = "npm"
+vulnerability.ignore = true
+reason = "Post-abort traversal of local trusted paths; no caller relies on AbortSignal. Fix only in glob 14, outside the parents' ^13 range."

@@ -1,0 +1,288 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:recommended',
+    'customManagers:dockerfileVersions',
+    ':separateMultipleMajorReleases',
+    ':semanticCommits',
+    ':label(dependencies)',
+    ':configMigration',
+    ':combinePatchMinorReleases',
+    'preview:dockerVersions',
+    'group:unitTestNonMajor',
+    ':enableVulnerabilityAlerts',
+    ':automergePr', // Still raise a PR for automerges
+    ':automergeDigest', // enable for PRs updating digests
+    ':automergePatch', // enable for lock files, patch and pin
+  ],
+  // Supply-chain hardening: wait until a release is at least 7 days old before
+  // proposing it, so compromised releases can be caught and yanked by the
+  // community first. Replaces the npm-only 'security:minimumReleaseAgeNpm'
+  // preset (3 days) with a stricter setting covering every datasource.
+  minimumReleaseAge: '7 days',
+  vulnerabilityAlerts: {
+    enabled: true,
+    // Security fixes must not wait out the cooldown (this is Renovate's
+    // default for vulnerability alerts, made explicit here on purpose)
+    minimumReleaseAge: null,
+  },
+  osvVulnerabilityAlerts: true,
+  // GitHub Actions are owned by Dependabot (.github/dependabot.yml). Renovate
+  // can not date the SHA-pinned digest updates (`uses: x@<sha> # v7`), so with
+  // minimumReleaseAgeBehaviour 'timestamp-required' they stayed pending
+  // forever, while Dependabot applies its 7-day cooldown on the tag release.
+  // Lock file maintenance is not enabled for the same reason: a lock file
+  // refresh has no release timestamp, so it could never pass minimumReleaseAge.
+  'github-actions': {
+    enabled: false,
+  },
+  hostRules: [
+    {
+      // repology.org is slow/flaky and frequently times out from the hosted runner.
+      // Without this, a repology ETIMEDOUT raises an ExternalHostError that aborts the
+      // whole repository run (Repository result: external-host-error), silently dropping
+      // all updates and Dependency Dashboard checkbox requests. Treat repology failures
+      // as a normal lookup miss instead of aborting the run.
+      matchHost: 'repology.org',
+      abortOnError: false,
+      timeout: 60000,
+    },
+  ],
+  packageRules: [
+    {
+      // js-yaml v5+ is ESM-only (dropped CommonJS). yeoman-environment loads the
+      // mega-linter-runner custom-flavor generator via require(), which cannot
+      // synchronously require() a pure-ESM js-yaml and fails with
+      // ERR_REQUIRE_ESM_RACE_CONDITION. Keep js-yaml on the v4 line (dual CJS/ESM).
+      matchPackageNames: [
+        'js-yaml',
+      ],
+      allowedVersions: '<5',
+    },
+    {
+      // TypeScript 7 is the native (Go) port and drops the JS compiler API that
+      // typescript-eslint relies on: @typescript-eslint/type-utils crashes on load
+      // ("Cannot read properties of undefined (reading 'Any')"), breaking
+      // TYPESCRIPT_ES, TYPESCRIPT_STANDARD, TSX_ESLINT... Keep TypeScript on v6
+      // until typescript-eslint and the other dependents support v7 (see #8404).
+      matchPackageNames: [
+        'typescript',
+      ],
+      allowedVersions: '<7',
+    },
+    {
+      // Test fixtures under .automation/test (except the frozen bad/ and .wireit/
+      // ones, see ignorePaths) only need to stay current: one weekly grouped PR
+      // instead of one PR per fixture dependency.
+      matchFileNames: [
+        '.automation/test/**',
+      ],
+      groupName: 'test fixtures',
+      schedule: [
+        'before 4am on Monday',
+      ],
+    },
+    {
+      // One Python version for every MegaLinter context: .python-version (local uv,
+      // CI setup-python via python-version-file) and every python:X.Y.Z-alpine base
+      // image (Dockerfile, flavors/, linters/, server/). Bump them all in the same PR,
+      // as the image build refuses to download a Python that differs from its base
+      // image (UV_PYTHON_DOWNLOADS=never). Patches come apart from minor upgrades, so
+      // closing a 3.15 PR never holds back 3.14 security patches.
+      groupName: 'Python',
+      matchDatasources: [
+        'docker',
+      ],
+      matchDepNames: [
+        'python',
+      ],
+      // Test fixtures keep their own weekly group
+      matchFileNames: [
+        '!.automation/test/**',
+      ],
+      separateMinorPatch: true,
+    },
+    {
+      matchPackageNames: [
+        'uv',
+        'astral-sh/uv',
+        'ghcr.io/astral-sh/uv',
+      ],
+      schedule: [
+        'before 4am on Friday',
+      ],
+      matchUpdateTypes: [
+        'digest',
+        'patch',
+        'minor',
+        'major',
+      ],
+    },
+    {
+      groupName: 'Roslynator',
+      matchSourceUrls: [
+        'https://github.com/dotnet/roslynator',
+      ],
+      matchUpdateTypes: [
+        'digest',
+        'patch',
+        'minor',
+        'major',
+      ],
+    },
+    {
+      matchPackageNames: [
+        'hardisgroupcom/sfdx-hardis',
+      ],
+      schedule: [
+        'before 8am on Friday',
+      ],
+    },
+    {
+      matchPackageNames: [
+        'checkov',
+      ],
+      schedule: [
+        'before 10am every 4 day',
+      ],
+    },
+    {
+      groupName: 'langchain',
+      matchPackageNames: [
+        'langchain_*',
+        'langchain*',
+      ],
+      schedule: [
+        'before 3pm every 3 day',
+      ],
+      matchUpdateTypes: [
+        'digest',
+        'patch',
+        'minor',
+        'major',
+      ],
+    },
+    {
+      groupName: 'Salesforce packages',
+      matchPackageNames: [
+        '@salesforce/**',
+      ],
+      schedule: [
+        'before 4am every 4 day',
+      ],
+      matchUpdateTypes: [
+        'digest',
+        'patch',
+        'minor',
+        'major',
+      ],
+    },
+    {
+      // Keep the betterleaks linter and the secret-masking ruleset pin
+      // (megalinter/constants.py) in the same PR so they never drift apart
+      groupName: 'betterleaks',
+      matchPackageNames: [
+        'ghcr.io/betterleaks/betterleaks',
+        'betterleaks/betterleaks',
+      ],
+    },
+    {
+      // npm-package-json-lint-config-default majors require the matching
+      // npm-package-json-lint major (config-default v10 needs linter v11), so
+      // separate PRs can never be merged on their own: group them together.
+      groupName: 'npm-package-json-lint',
+      matchPackageNames: [
+        'npm-package-json-lint',
+        'npm-package-json-lint-config-default',
+      ],
+      matchUpdateTypes: [
+        'digest',
+        'patch',
+        'minor',
+        'major',
+      ],
+    },
+  ],
+  customManagers: [
+    {
+      customType: 'regex',
+      description: 'Update version inputs in GitHub Actions workflow files (e.g. trivy version)',
+      managerFilePatterns: [
+        '/(^|/)\\.github/workflows/.*\\.ya?ml$/',
+      ],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: registryUrl=(?<registryUrl>[^\\s]+?))?\\s+version: ["\']?(?<currentValue>[^"\'\\s]+)["\']?',
+      ],
+    },
+    {
+      customType: 'regex',
+      description: 'Update dockerfile sections in .megalinter-descriptor.yml and shared .megalinter-linter.yml files',
+      managerFilePatterns: [
+        '/(^|/).*\\.devcontainer(\\\\|/)Dockerfile$/',
+        '/(^|/).*\\.megalinter-descriptor\\.ya?ml$/',
+        '/(^|/).*\\.megalinter-linter\\.ya?ml$/',
+      ],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: registryUrl=(?<registryUrl>[^\\s]+?))?\\s(?:ENV|ARG)\\s+[A-Za-z0-9_]+?_VERSION[ =]["\']?(?<currentValue>.+?)["\']?\\s',
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: registryUrl=(?<registryUrl>[^\\s]+?))?\\s+(?:ENV|ARG)\\s+[A-Za-z0-9_]+?_VERSION[ =]["\']?(?<currentValue>.+?)["\']?\\s',
+      ],
+    },
+    {
+      customType: 'regex',
+      description: 'Update dependencies configured in constants.py file',
+      managerFilePatterns: [
+        '/(^|/).*megalinter(\\\\|/)constants\\.py$/',
+      ],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: registryUrl=(?<registryUrl>[^\\s]+?))?\\\\n(?:ENV|ARG)\\s+[A-Za-z0-9_]+?_VERSION[ =]["\']?(?<currentValue>.+?)["\']?,',
+      ],
+    },
+    {
+      customType: 'regex',
+      description: 'Update plain version constants in constants.py file',
+      managerFilePatterns: [
+        '/(^|/).*megalinter(\\\\|/)constants\\.py$/',
+      ],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: registryUrl=(?<registryUrl>[^\\s]+?))?\\s+[A-Z0-9_]+_VERSION\\s*=\\s*["\'](?<currentValue>[^"\']+)["\']',
+      ],
+    },
+    {
+      customType: 'regex',
+      description: 'Update the commit SHA of git-pinned Python dependencies (e.g. the Zensical-compatible mike fork)',
+      managerFilePatterns: [
+        '/(^|/)requirements\\.txt$/',
+        '/(^|/)pyproject\\.toml$/',
+      ],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?) branch=(?<currentValue>[^\\s]+?)\\s+["\']?[A-Za-z0-9_.-]+ @ git\\+[^@\\s]+@(?<currentDigest>[0-9a-f]{40})',
+      ],
+    },
+    {
+      customType: 'regex',
+      description: 'Update dependencies configured with containerEnv in devcontainer.json file',
+      managerFilePatterns: [
+        '/(^|/).*\\.devcontainer(\\\\|/)devcontainer\\.json$/',
+      ],
+      matchStrings: [
+        '\/\/ renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: registryUrl=(?<registryUrl>[^\\s]+?))?\\s+["\']?[A-Za-z0-9_]+?["\']?:\\s["\']?(?<currentValue>.+?)["\']?\\s',
+      ],
+    },
+  ],
+  // Frozen test fixtures: the bad/ folders and the .wireit/ poison fixtures under
+  // .automation/test intentionally ship outdated / vulnerable dependencies so
+  // MegaLinter's security linters have something to detect. Every other test
+  // folder (good/, fix/...) is kept up to date, except repository_syft/good/good:
+  // a snapshot of an old mega-linter-runner whose lock file only exists as SBOM input
+  // for syft, and that npm refuses to regenerate (remote npm-6.14.18.tgz download blocked).
+  ignorePaths: [
+    '.automation/test/**/bad/**',
+    '.automation/test/**/.wireit/**',
+    '.automation/test/repository_syft/good/good/**',
+  ],
+  dockerfile: {
+    managerFilePatterns: [
+      '/^\\.automation/test/Dockerfile-megalinter-custom$/'
+    ]
+  }
+}

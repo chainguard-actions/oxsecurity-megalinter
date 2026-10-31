@@ -1,0 +1,38 @@
+name: Test MegaLinter passes on valid JSON
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        env:
+          MEGALINTER_CONFIG: tests/fixtures/megalinter/test.mega-linter.yml
+          ENABLE_LINTERS: JSON_JSONLINT
+          FILTER_REGEX_INCLUDE: 'tests/fixtures/megalinter/valid/'
+          VALIDATE_ALL_CODEBASE: "true"
+          APPLY_FIXES: none
+          REPORT_OUTPUT_FOLDER: megalinter-reports-valid
+      - name: Assert step succeeded and reports were produced
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          UPDATED: ${{ steps.action.outputs.has_updated_sources }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "has_updated_sources: '$UPDATED'"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected success"
+            exit 1
+          fi
+          if [ -n "$UPDATED" ] && [ "$UPDATED" != "0" ]; then
+            echo "FAIL: expected has_updated_sources to be 0 (APPLY_FIXES=none)"
+            exit 1
+          fi
+          ls -la "$GITHUB_WORKSPACE/megalinter-reports-valid" || true
+          if [ ! -d "$GITHUB_WORKSPACE/megalinter-reports-valid" ]; then
+            echo "FAIL: report folder not created"
+            exit 1
+          fi
+          echo "PASS"
